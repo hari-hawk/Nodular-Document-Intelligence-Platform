@@ -739,6 +739,74 @@ async def admin_reject_auto_pack(
 
 
 # ---------------------------------------------------------------------------
+# Handler registry — code-bridge for patterns + commands (Wave 2.5)
+# ---------------------------------------------------------------------------
+@router.get("/admin/handlers", dependencies=[Depends(require_admin)])
+async def admin_list_handlers() -> dict[str, Any]:
+    """Manifest of all registered Python handlers in this process.
+
+    Patterns and natural-language commands reference handlers by
+    `handler_id`. This endpoint is the public allow-list — the LLM
+    dispatcher reads it to know what it can invoke.
+    """
+    from mdi.handlers import list_handlers
+    return {"handlers": list_handlers()}
+
+
+class RunHandlerPayload(BaseModel):
+    document_id: uuid.UUID | None = None
+    kwargs: dict[str, Any] = Field(default_factory=dict)
+
+
+@router.post(
+    "/admin/handlers/{handler_id}/run",
+    dependencies=[Depends(require_admin)],
+)
+async def admin_run_handler(
+    handler_id: str,
+    payload: RunHandlerPayload,
+    tenant: Tenant = Depends(current_tenant),
+    db: AsyncSession = Depends(db_session),
+) -> dict[str, Any]:
+    """Execute a registered handler against the current tenant context.
+
+    The handler runs with whatever document context the caller supplies
+    (we hydrate the extraction + cluster from the DB if document_id is
+    set). Returns the HandlerResult shape — `ok`, `output`, `data`,
+    `side_effects` — so the caller can render it directly.
+    """
+    from mdi.handlers import HandlerContext, run_handler
+
+    extraction_dict: dict[str, Any] = {}
+    cluster_dict: dict[str, Any] = {}
+    if payload.document_id is not None:
+        row = (await db.execute(text(
+            "SELECT d.cluster, e.fields "
+            "FROM documents d LEFT JOIN extractions e ON e.document_id = d.id "
+            "WHERE d.id = :id"
+        ), {"id": str(payload.document_id)})).first()
+        if row is None:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "document not found")
+        cluster_dict = row[0] or {}
+        extraction_dict = row[1] or {}
+
+    ctx = HandlerContext(
+        tenant_id=tenant.id,
+        document_id=payload.document_id,
+        extraction=extraction_dict,
+        cluster=cluster_dict,
+        kwargs=payload.kwargs,
+    )
+    result = await run_handler(handler_id, ctx)
+    return {
+        "ok": result.ok,
+        "output": result.output,
+        "data": result.data,
+        "side_effects": result.side_effects,
+    }
+
+
+# ---------------------------------------------------------------------------
 # Tenant facts — per-tenant master-data store (Wave 2.4)
 # ---------------------------------------------------------------------------
 @router.get("/admin/tenant-facts", dependencies=[Depends(require_admin)])
