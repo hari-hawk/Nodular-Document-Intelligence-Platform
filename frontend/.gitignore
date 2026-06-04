@@ -1,0 +1,13 @@
+# Generated / installed
+node_modules
+.next
+out
+tsconfig.tsbuildinfo
+
+# Editor / OS
+.DS_Store
+.idea
+.vscode
+
+# Env files — never commit secrets
+.env*.local

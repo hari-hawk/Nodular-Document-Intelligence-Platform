@@ -1,0 +1,35 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Surfaces — these CSS variables let dark/light mode swap palettes
+ * without touching component code. Components reference `bg-surface`,
+ * `text-fg` etc. through tailwind arbitrary values. */
+:root {
+  --bg: 248 250 252;          /* slate-50 */
+  --surface: 255 255 255;
+  --surface-muted: 241 245 249;  /* slate-100 */
+  --border: 226 232 240;      /* slate-200 */
+  --fg: 15 23 42;             /* slate-900 */
+  --fg-muted: 71 85 105;      /* slate-600 */
+}
+
+.dark {
+  --bg: 2 6 23;               /* slate-950 */
+  --surface: 15 23 42;        /* slate-900 */
+  --surface-muted: 30 41 59;  /* slate-800 */
+  --border: 51 65 85;         /* slate-700 */
+  --fg: 248 250 252;          /* slate-50 */
+  --fg-muted: 148 163 184;    /* slate-400 */
+}
+
+html, body {
+  background: rgb(var(--bg));
+  color: rgb(var(--fg));
+}
+
+/* The selection color uses the brand 500 so highlights feel native to
+ * the platform's identity instead of OS-default blue. */
+::selection {
+  background-color: rgb(99 102 241 / 0.25);
+}

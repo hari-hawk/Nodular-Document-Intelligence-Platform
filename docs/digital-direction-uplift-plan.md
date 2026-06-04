@@ -226,7 +226,7 @@ Extend Conscience's rule mechanism: a pattern (or a finding from a detector) can
 - **Wave 1** now ships **Vertex + Vision providers together** (was Vertex-only).
 - **Wave 1.2** auto-pack registry: write stubs immediately, but they require a **one-click promote** from the Review page before they influence extraction.
 - **Wave 2** now adds **multi-pattern retrieval** (return top-N above threshold, not top-1) and the **handler registry + code bridge**.
-- **Wave 3** adds two pages to the original 9: a **Patterns** explorer (already in DD) and a **Commands** page (new) that shows registered handlers + recent invocations.
+- **Wave 3** (revised 2026-06-04, Hari): the original 9-11 flat pages are consolidated to **3 routes + 1 chat drawer**. The natural workflow ("upload → see results → review") is one page stacked top-to-bottom (Workspace); learned state (Patterns + Tenant Facts + Auto-packs + Handlers) is one page with tabs (Brain); platform admin (Spend + Tenants + Settings) is one page with tabs (Admin). Chat lives as a slide-in drawer accessible from any route — asking the brain a question never warrants a route change.
 - **Wave 4** target lifted to **90%** golden accuracy on insurance.
 
 ---
