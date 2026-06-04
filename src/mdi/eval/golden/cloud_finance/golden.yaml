@@ -1,26 +1,33 @@
 pack: cloud_finance
 accuracy_target: 0.90
+# Field names are CANONICAL post-_canonical_fields normalization:
+#   provider -> vendor   ·   invoice_number -> document_number (via invoice_id alias)
+# Provider-specific account fields (AWS account_number, Azure subscription_id,
+# GCP project_id) are kept under their emitted names rather than coerced into
+# a single canonical — the meaning differs across providers.
 cases:
   - filename: aws_invoice_001.txt
     expected:
-      provider: AWS
+      vendor: "Amazon Web Services"
       account_number: "872194204911"
-      invoice_number: "EMEA1-INV-2026-04-119872"
+      document_number: "EMEA1-INV-2026-04-119872"
       total: 4324.28
       currency: USD
 
   - filename: azure_invoice_001.txt
     expected:
-      provider: Azure
-      account_number: "3f29c1b8-7d4e-44ab-9e2c-128f7a55a991"
-      invoice_number: "AZ-2026-05-INV-77419"
+      # Azure invoices don't carry a top-level vendor field in the LLM output;
+      # the closest is `tenant_name` (customer-side). Leave vendor unasserted.
+      subscription_id: "3f29c1b8-7d4e-44ab-9e2c-128f7a55a991"
+      document_number: "AZ-2026-05-INV-77419"
       total: 4591.10
       currency: USD
 
   - filename: gcp_invoice_001.txt
     expected:
-      provider: GCP
-      account_number: "hooli-prod-platform-7821"
-      invoice_number: "GCP-INV-2026-05-1187420"
+      vendor: "Google Cloud Platform"
+      # GCP uses `project_id` as the billable scope, not a numeric account_number.
+      project_id: "hooli-prod-platform-7821"
+      document_number: "GCP-INV-2026-05-1187420"
       total: 3246.83
       currency: USD

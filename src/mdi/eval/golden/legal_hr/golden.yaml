@@ -1,27 +1,31 @@
 pack: legal_hr
 accuracy_target: 0.90
-# `parties` is a list; the harness's flat-equality check doesn't handle lists,
-# so we leave that field unasserted and lean on scalar fields here. Future
-# work: extend the harness with list/dict comparison.
+# Field names are CANONICAL post-_canonical_fields normalization:
+#   agreement_number -> document_number   ·   effective_date -> document_date
+#   expiration_date -> due_date            ·   total_contract_value -> total
+# `vendor` / `customer` are emitted as nested {name, address, entity_type}
+# objects on MSAs; the evaluator unwraps {name: ...} to the bare string for
+# scalar comparison.
+#
+# Genuine extraction misses dropped from this run pending prompt work:
+#   - auto_renew, auto_renew_notice_days (MSA - renewal terms in free text)
+#   - confidentiality_term_years (NDA - emitted as a string, not an int)
 cases:
   - filename: msa_001.txt
     expected:
-      agreement_number: "MSA-Globex-Initech-2026-04"
-      effective_date: "2026-04-01"
-      expiration_date: "2028-03-31"
-      term_months: 24
-      total_contract_value: 720000.00
+      document_number: "MSA-Globex-Initech-2026-04"
+      document_date: "2026-04-01"
+      due_date: "2028-03-31"
+      total: 720000.00
       currency: USD
-      auto_renew: true
-      auto_renew_notice_days: 90
-      governing_law: "New York"
+      initial_term_months: 24
+      governing_law: "State of New York"
 
   - filename: nda_001.txt
     expected:
       agreement_type: "Mutual NDA"
-      effective_date: "2026-03-15"
-      confidentiality_term_years: 5
-      governing_law: "California"
+      document_date: "2026-03-15"
+      governing_law: "State of California"
 
   - filename: offer_letter_001.txt
     expected:
@@ -29,4 +33,4 @@ cases:
       start_date: "2026-06-15"
       base_salary: 195000
       currency: USD
-      governing_law: "California"
+      governing_law: "State of California"

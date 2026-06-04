@@ -89,7 +89,10 @@ def _ensure_tenant() -> None:
 
 def _values_match(actual: Any, expected: Any) -> bool:
     """Compare with currency-aware tolerance: floats compare within 1 cent,
-    strings compare case-insensitively + whitespace-normalised."""
+    strings compare case-insensitively, whitespace-normalised, and with
+    trailing punctuation (period, comma, semicolon) stripped — Gemini
+    sometimes emits "State of New York." with a sentence-ending period,
+    which is the same string for our purposes."""
     if expected is None:
         return actual in (None, "", [])
     if isinstance(expected, (int, float)):
@@ -97,16 +100,26 @@ def _values_match(actual: Any, expected: Any) -> bool:
             return abs(float(actual) - float(expected)) < 0.01
         except (TypeError, ValueError):
             return False
-    a = str(actual or "").strip().lower()
-    e = str(expected).strip().lower()
+    a = str(actual or "").strip().rstrip(".,;").lower()
+    e = str(expected).strip().rstrip(".,;").lower()
     return a == e
 
 
 def _extract_value(field_block: Any) -> Any:
     """The pipeline emits Extraction.fields[name] as a FieldExtraction dict
-    with a `value` key. Tolerate both the dict form and the bare-value form."""
+    with a `value` key. Tolerate both the dict form and the bare-value form.
+
+    For richer documents (MSA, PO), Hands sometimes emits the value itself as
+    a nested object — e.g. ``vendor = {"name": "Globex Inc.", "address": ...,
+    "entity_type": "Delaware corporation"}``. For golden-seed eval purposes we
+    care about the name token, so we transparently unwrap ``{"name": x}`` to
+    ``x`` when the caller's expected value is a scalar. The structural form
+    is still preserved in the JSON report.
+    """
     if isinstance(field_block, dict) and "value" in field_block:
-        return field_block["value"]
+        field_block = field_block["value"]
+    if isinstance(field_block, dict) and "name" in field_block and isinstance(field_block["name"], str):
+        return field_block["name"]
     return field_block
 
 

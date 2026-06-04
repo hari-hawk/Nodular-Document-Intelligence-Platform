@@ -1,24 +1,34 @@
 pack: healthcare_claims
 accuracy_target: 0.90
+# Field names are CANONICAL post-_canonical_fields normalization:
+#   claim_number -> document_number   ·   total_charge -> total
 # NOTE on PHI: synthetic patient_id values only. NO real patient names / DOB.
 # The no_patient_name_leaked validator should pass on every case here.
+#
+# 837 vs 835 vs prior-auth use different names for the "provider" entity:
+#   - 837 claim:    `submitter_name` (the billing entity submitting the claim)
+#   - 835 remit:    `provider_name`
+#   - prior auth:   `provider_name`
+# This isn't an alias gap - they're genuinely different EDI roles. The harness
+# asserts each shape on the case it applies to.
 cases:
   - filename: claim_837_001.txt
+    expected:
+      submitter_name: "Wellness Medical Group, PLLC"
+      provider_npi: "1487654329"
+      payer_name: "BlueCross BlueShield of Massachusetts"
+      document_number: "CLM-2026-04-91182"
+      patient_id: "PAT-558491"
+      total: 1847.50
+
+  - filename: remit_835_001.txt
     expected:
       provider_name: "Wellness Medical Group, PLLC"
       provider_npi: "1487654329"
       payer_name: "BlueCross BlueShield of Massachusetts"
-      claim_number: "CLM-2026-04-91182"
-      patient_id: "PAT-558491"
-      total_charge: 1847.50
-
-  - filename: remit_835_001.txt
-    expected:
-      provider_npi: "1487654329"
-      payer_name: "BlueCross BlueShield of Massachusetts"
-      claim_number: "CLM-2026-04-91182"
-      total_charge: 1847.50
+      document_number: "CLM-2026-04-91182"
       total_paid: 1602.30
+      total_billed: 1847.50
 
   - filename: prior_auth_001.txt
     expected:

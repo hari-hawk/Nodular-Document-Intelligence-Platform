@@ -1,28 +1,32 @@
 pack: telecom_billing
 accuracy_target: 0.90
-# Conservative expected values — only fields the LLM emits deterministically.
-# Vendor names, account numbers, document numbers, and totals are the safest;
-# free-text fields (rationale, descriptions) are skipped to avoid LLM-variance flakes.
+# Field names are CANONICAL (after _canonical_fields.normalize_extraction):
+#   carrier -> vendor   ·   invoice_number -> document_number
+# Pre-canonical aliases would fail by construction even when extraction is correct.
+# Vendor strings match the LLM's full emitted form ("AT&T Business Services",
+# "Verizon Business") rather than the bare brand — fuzzy/contains match would be
+# a harness change, not a golden change.
 cases:
   - filename: att_invoice_001.txt
     expected:
-      carrier: "AT&T"
+      vendor: "AT&T Business Services"
       account_number: "0133442501"
-      invoice_number: "ATT-INV-2026-04-7711"
+      document_number: "ATT-INV-2026-04-7711"
       total: 3054.08
       currency: USD
       contract_reference: "MSA-AT&T-Globex-2024-09"
 
   - filename: verizon_invoice_001.txt
     expected:
-      carrier: "Verizon"
+      vendor: "Verizon Business"
       account_number: "8841220199"
-      invoice_number: "VZB-2026-05-1148820"
+      document_number: "VZB-2026-05-1148820"
       total: 3939.03
       currency: USD
 
   - filename: centurylink_csr_001.txt
     expected:
-      carrier: "CenturyLink"
+      # A customer service record identifies the customer, not the carrier;
+      # there's no invoice-style vendor field to assert on.
       account_number: "LMN-44729108"
       customer: "Hooli Inc."

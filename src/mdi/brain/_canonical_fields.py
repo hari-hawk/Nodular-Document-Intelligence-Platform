@@ -35,16 +35,19 @@ ALIASES: dict[str, str] = {
     "service_provider": "vendor",
     "biller": "vendor",
     "supplier": "vendor",
+    "supplier_name": "vendor",  # Gemini emits flat snake_case on POs sometimes
     "seller": "vendor",
 
     # Customer / billed party
     "customer_name": "customer",
     "bill_to": "customer",
     "buyer": "customer",
+    "buyer_name": "customer",  # Gemini emits flat snake_case on POs sometimes
     "billed_party": "customer",
 
     # Document numbers
     "invoice_number": "document_number",
+    "invoice_id": "document_number",  # Gemini emits this on AT&T + AWS invoices
     "po_number": "document_number",
     "contract_number": "document_number",
     "claim_number": "document_number",
@@ -63,6 +66,7 @@ ALIASES: dict[str, str] = {
 
     # Amounts
     "total_amount": "total",
+    "total_amount_due": "total",  # Gemini emits this on Verizon invoices
     "total_due": "total",
     "total_charge": "total",
     "total_contract_value": "total",
