@@ -11,7 +11,6 @@ from __future__ import annotations
 
 import statistics
 from collections import defaultdict
-from typing import Any
 from uuid import UUID
 
 from mdi.kernel.llm_gateway import GatewayLike

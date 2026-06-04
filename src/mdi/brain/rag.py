@@ -25,7 +25,6 @@ from __future__ import annotations
 import re
 import uuid
 from dataclasses import dataclass
-from typing import Any
 
 from sqlalchemy import text
 from sqlalchemy.dialects.postgresql import insert as pg_insert

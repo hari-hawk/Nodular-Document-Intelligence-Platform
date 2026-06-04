@@ -1,7 +1,7 @@
 """Account Briefing — per-group reconciliation (Stage 14)."""
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from mdi.models.schemas import (
@@ -64,7 +64,7 @@ def brief(
         if when:
             timeline.append(
                 TimelineEvent(
-                    occurred_at=when.replace(tzinfo=when.tzinfo or timezone.utc),
+                    occurred_at=when.replace(tzinfo=when.tzinfo or UTC),
                     description=f"{c.doc_type} from {c.vendor}",
                     document_id=did,
                 )

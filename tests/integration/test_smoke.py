@@ -13,7 +13,6 @@ from uuid import uuid4
 
 import pytest
 
-
 SAMPLE_INVOICE = b"""From: Acme Corp
 Bill To: Globex Inc.
 Invoice Number: INV-1001

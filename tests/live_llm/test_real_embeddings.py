@@ -13,8 +13,8 @@ Opt in with:
 from __future__ import annotations
 
 import os
-import pytest
 
+import pytest
 
 pytestmark = pytest.mark.live_llm
 
@@ -32,7 +32,7 @@ def test_real_embeddings_capture_vendor_variants(reset_runtime) -> None:
 
     # Import here so the module load doesn't pull sentence-transformers
     # for the skip path.
-    from mdi.brain.hippocampus import _Embedder, SIMILARITY_THRESHOLD
+    from mdi.brain.hippocampus import SIMILARITY_THRESHOLD, _Embedder
 
     real = _Embedder(use_real_model=True)
     # First call triggers the load (covered by reset_runtime + 30s budget).

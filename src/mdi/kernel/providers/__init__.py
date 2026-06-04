@@ -9,6 +9,7 @@ Adding a new provider takes three steps:
   2. register it via `register_provider("name", FactoryFn)` at module-load time
   3. enable it in `kernel/provider_router.py` for the organ tiers it supports
 """
+from mdi.kernel.providers.anthropic_provider import AnthropicProvider
 from mdi.kernel.providers.base import (
     BaseProvider,
     ProviderCallResult,
@@ -18,17 +19,16 @@ from mdi.kernel.providers.base import (
     list_providers,
     register_provider,
 )
-from mdi.kernel.providers.anthropic_provider import AnthropicProvider
 from mdi.kernel.providers.gemini_provider import GeminiProvider
 
 __all__ = [
+    "AnthropicProvider",
     "BaseProvider",
+    "GeminiProvider",
     "ProviderCallResult",
     "ProviderError",
     "ProviderNotConfigured",
     "get_provider",
     "list_providers",
     "register_provider",
-    "AnthropicProvider",
-    "GeminiProvider",
 ]

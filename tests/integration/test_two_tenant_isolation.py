@@ -14,7 +14,6 @@ import uuid
 
 import pytest
 
-
 pytestmark = [pytest.mark.integration]
 
 
@@ -37,7 +36,7 @@ async def test_two_tenants_are_isolated(installed_fake_gateway):
     from sqlalchemy import select
 
     from mdi.kernel.auth import reset_engine, tenant_session
-    from mdi.models.db import Document, Tenant
+    from mdi.models.db import Document
     from mdi.orchestrator.pipeline import run_batch_async
 
     reset_engine()
@@ -50,17 +49,16 @@ async def test_two_tenants_are_isolated(installed_fake_gateway):
     with psycopg.connect(
         os.environ.get("DATABASE_URL", "postgresql://mdi:mdi@localhost:5432/mdi"),
         autocommit=True,
-    ) as conn:
-        with conn.cursor() as cur:
-            cur.execute("SET row_security = off")
-            cur.execute(
-                "INSERT INTO tenants (id, slug, display_name) VALUES (%s, %s, %s)",
-                (str(a), f"test-a-{a.hex[:6]}", "Tenant A"),
-            )
-            cur.execute(
-                "INSERT INTO tenants (id, slug, display_name) VALUES (%s, %s, %s)",
-                (str(b), f"test-b-{b.hex[:6]}", "Tenant B"),
-            )
+    ) as conn, conn.cursor() as cur:
+        cur.execute("SET row_security = off")
+        cur.execute(
+            "INSERT INTO tenants (id, slug, display_name) VALUES (%s, %s, %s)",
+            (str(a), f"test-a-{a.hex[:6]}", "Tenant A"),
+        )
+        cur.execute(
+            "INSERT INTO tenants (id, slug, display_name) VALUES (%s, %s, %s)",
+            (str(b), f"test-b-{b.hex[:6]}", "Tenant B"),
+        )
 
     # Run a batch as each tenant.
     payload = {"filename": "x.txt", "content": b"From: Acme Corp\nTotal: 10\n"}

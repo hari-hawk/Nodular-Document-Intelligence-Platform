@@ -11,10 +11,10 @@ Cost budget: ~$0.10 (5 cold-start docs + 1 warm-hit doc).
 from __future__ import annotations
 
 import asyncio
+
 import pytest
 
 from tests.live_llm.conftest import TENANT_A
-
 
 pytestmark = pytest.mark.live_llm
 

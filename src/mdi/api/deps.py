@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import hmac
 import uuid
-from typing import AsyncIterator
+from collections.abc import AsyncIterator
 
 from fastapi import Depends, Header, HTTPException, status
 from sqlalchemy import select

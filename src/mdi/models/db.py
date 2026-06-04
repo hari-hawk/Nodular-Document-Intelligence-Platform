@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
-from typing import Any
+from typing import Any, ClassVar
 
 from pgvector.sqlalchemy import Vector
 from sqlalchemy import (
@@ -31,14 +31,15 @@ from sqlalchemy.orm import (
     Mapped,
     MappedAsDataclass,
     mapped_column,
-    relationship,
 )
 
 
 class Base(MappedAsDataclass, DeclarativeBase, kw_only=True):
     """Common base — pgvector type registers automatically when models are imported."""
 
-    type_annotation_map = {
+    # ClassVar tells the dataclass machinery this is not a field — and
+    # tells ruff (RUF012) it's intentionally a mutable class-level mapping.
+    type_annotation_map: ClassVar[dict[Any, Any]] = {
         dict[str, Any]: JSONB,
         list[str]: ARRAY(Text),
     }

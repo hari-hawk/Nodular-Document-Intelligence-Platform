@@ -24,7 +24,7 @@ import time
 import uuid
 from dataclasses import dataclass, field
 from datetime import date
-from typing import Any, Literal, Protocol
+from typing import Any, Protocol
 
 from tenacity import (
     AsyncRetrying,
@@ -142,7 +142,7 @@ class GatewayLike(Protocol):
         model: str | None = ...,
         provider: str | None = ...,
         tier: OrganTier | None = ...,
-    ) -> "GatewayResponse": ...
+    ) -> GatewayResponse: ...
 
 
 @dataclass
@@ -359,15 +359,15 @@ def reset_gateway() -> None:
 
 # Re-export ProviderError for callers that want to differentiate.
 __all__ = [
-    "LLMGateway",
+    "PRICE_TABLE",
+    "BudgetExceeded",
+    "CostTracker",
     "GatewayLike",
     "GatewayResponse",
-    "CostTracker",
-    "BudgetExceeded",
-    "estimate_cost_usd",
-    "PRICE_TABLE",
-    "get_gateway",
-    "set_gateway",
-    "reset_gateway",
+    "LLMGateway",
     "ProviderError",
+    "estimate_cost_usd",
+    "get_gateway",
+    "reset_gateway",
+    "set_gateway",
 ]

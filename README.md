@@ -1,5 +1,7 @@
 # MDI — Modular Data Intelligence
 
+[![CI](https://github.com/hari-hawk/Nodular-Document-Intelligence-Platform/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/hari-hawk/Nodular-Document-Intelligence-Platform/actions/workflows/ci.yml)
+
 A reusable, multi-domain document intelligence brain. Reads invoices, purchase orders, contracts, claims, statements across any industry; learns from corrections; surfaces analyst-grade insights. Multi-tenant from day one.
 
 ## Quick start

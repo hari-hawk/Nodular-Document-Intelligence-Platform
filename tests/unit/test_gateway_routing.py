@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import pytest
-from tenacity import RetryError
 
 from mdi.kernel.llm_gateway import LLMGateway
 from mdi.kernel.providers.base import (

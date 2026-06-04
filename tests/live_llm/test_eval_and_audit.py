@@ -13,12 +13,11 @@ from __future__ import annotations
 
 import asyncio
 import json
+
 import psycopg
 import pytest
-from pathlib import Path
 
-from tests.live_llm.conftest import TENANT_A, SAMPLE_DOCS, _admin_dsn
-
+from tests.live_llm.conftest import SAMPLE_DOCS, TENANT_A, _admin_dsn
 
 pytestmark = pytest.mark.live_llm
 

@@ -11,13 +11,11 @@ from __future__ import annotations
 
 import re
 import time
-from typing import Any
 from uuid import UUID
 
 from mdi.brain.knowledge_graph import KnowledgeGraph
 from mdi.kernel.llm_gateway import GatewayLike, get_gateway
 from mdi.models.schemas import ChatRequest, ChatResponse
-
 
 # Light-weight intent router. Production would ship a small classifier.
 _RELATIONSHIP_PATTERNS = (
@@ -89,7 +87,7 @@ async def chat(
         chunks = await retriever.retrieve(kg.session, query=request.question, top_k=6)
         rag_block = format_for_prompt(chunks)
         citations = [c.document_id for c in chunks]
-    except Exception:  # noqa: BLE001
+    except Exception:
         rag_block = ""
 
     system = (
@@ -118,7 +116,7 @@ async def chat(
             temperature=0.2,
         )
         answer = resp.text.strip()
-    except Exception:  # noqa: BLE001
+    except Exception:
         answer = "Could not reach the LLM. Try a relationship question — those are graph-routed."
 
     return ChatResponse(

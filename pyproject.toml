@@ -118,7 +118,21 @@ target-version = "py311"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "N", "B", "UP", "RUF", "SIM"]
-ignore = ["E501"]
+ignore = [
+    "E501",   # line-too-long — Black handles this
+    "B008",   # function call as default arg — FastAPI's `Depends()` pattern
+    "RUF001", # ambiguous unicode in string — we use em-dashes intentionally in prompts
+    "RUF002", # ambiguous unicode in docstring — same as above for comments
+    "N818",   # exception name not ending in 'Error' — `BudgetExceeded` etc. read naturally
+]
+
+[tool.ruff.lint.per-file-ignores]
+# Streamlit-app + scripts intentionally import after sys.path mutation.
+"src/mdi/ui/streamlit_app.py" = ["E402"]
+"src/mdi/kernel/providers/anthropic_provider.py" = ["E402"]  # SDK import after key check
+"scripts/*.py" = ["E402"]
+# Tests can be permissive about a few cleanliness rules.
+"tests/**/*.py" = ["B905", "SIM117"]
 
 [tool.black]
 line-length = 100

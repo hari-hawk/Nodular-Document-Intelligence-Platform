@@ -1,8 +1,9 @@
 """Conscience — sandboxed rule execution + invent-disabled-by-default."""
 from __future__ import annotations
 
-import pytest
 from uuid import uuid4
+
+import pytest
 
 from mdi.brain import conscience
 from mdi.brain.hippocampus import baseline_rules_from_schema

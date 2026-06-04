@@ -11,10 +11,10 @@ from __future__ import annotations
 
 import asyncio
 import os
+
 import pytest
 
 from tests.live_llm.conftest import TENANT_A
-
 
 pytestmark = pytest.mark.live_llm
 

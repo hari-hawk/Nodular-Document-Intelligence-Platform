@@ -7,7 +7,8 @@ inside a `tenant_session` so policies fire.
 from __future__ import annotations
 
 import uuid
-from typing import Any, Iterable
+from collections.abc import Iterable
+from typing import Any
 
 from sqlalchemy import select, text
 from sqlalchemy.dialects.postgresql import insert as pg_insert

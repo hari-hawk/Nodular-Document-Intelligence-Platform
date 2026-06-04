@@ -1,7 +1,7 @@
 """Pydantic schemas — strict mode + key invariants."""
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from uuid import uuid4
 
 import pytest
@@ -37,7 +37,7 @@ def test_schema_round_trips():
 
 
 def test_batch_report_finished_after_started():
-    started = datetime.now(timezone.utc)
+    started = datetime.now(UTC)
     BatchReport(
         tenant_id=uuid4(),
         started_at=started,

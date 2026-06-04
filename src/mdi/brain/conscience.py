@@ -72,23 +72,23 @@ def _run_safely(expression: str, fields: dict[str, Any]) -> tuple[bool, str | No
         sandbox = _se.SimpleEval(functions=_SAFE_FUNCTIONS, names={"fields": fields})
         # simpleeval exposes its evaluator method named .eval; this is the
         # whitelisted sandbox runner, not Python's builtin.
-        method = getattr(sandbox, "eval")
+        method = sandbox.eval
         return bool(method(expression)), None
-    except Exception as e:  # noqa: BLE001 - simpleeval raises a wide variety
+    except Exception as e:
         return False, f"{type(e).__name__}: {e}"
 
 
 def _smoke_check(expression: str) -> bool:
     """Validate that `expression` parses + runs against an empty dict (sanity only)."""
     try:
-        runner = getattr(_se, "simple_eval")
+        runner = _se.simple_eval
         runner(expression, names={"fields": {}})
         return True
     except Exception:
         # Missing fields is expected; we only treat parse-time errors as fatal.
         # We approximate by checking if it's a SyntaxError-like name.
         try:
-            getattr(_se, "simple_eval")("1 + 1")
+            _se.simple_eval("1 + 1")
             return True  # baseline works; original failure was likely just missing keys
         except Exception:
             return False

@@ -17,7 +17,6 @@ from __future__ import annotations
 
 import asyncio
 import io
-import json
 import os
 import sys
 import tempfile
@@ -45,14 +44,13 @@ if env_path.exists():
             k, v = line.split("=", 1)
             os.environ.setdefault(k.strip(), v.strip())
 
-from mdi.brain.hippocampus import Hippocampus  # noqa: E402
-from mdi.kernel import provider_router  # noqa: E402
-from mdi.kernel.auth import reset_engine, tenant_session  # noqa: E402
-from mdi.kernel.llm_gateway import get_gateway, reset_gateway  # noqa: E402
-from mdi.kernel.providers.base import reset_providers  # noqa: E402
-from mdi.kernel.settings import get_settings  # noqa: E402
-from mdi.orchestrator.pipeline import run_batch_async  # noqa: E402
-
+from mdi.brain.hippocampus import Hippocampus
+from mdi.kernel import provider_router
+from mdi.kernel.auth import reset_engine, tenant_session
+from mdi.kernel.llm_gateway import reset_gateway
+from mdi.kernel.providers.base import reset_providers
+from mdi.kernel.settings import get_settings
+from mdi.orchestrator.pipeline import run_batch_async
 
 # ---------------------------------------------------------------------------
 # Page config + custom CSS
@@ -132,6 +130,7 @@ def _badge(label: str, kind: str = "info") -> str:
 def _probe_api_health(api_url: str = "http://127.0.0.1:8080") -> dict[str, Any]:
     """Probe the FastAPI /health endpoint. Returns {up, ms, error}."""
     import time
+
     import httpx
     t0 = time.monotonic()
     try:
@@ -259,7 +258,7 @@ def render_sidebar() -> str:
             if fb:
                 line += f" → fb {fb[0]}"
             st.sidebar.caption(line)
-    except Exception as e:  # noqa: BLE001
+    except Exception as e:
         st.sidebar.warning(f"Router error: {e}")
 
     # Provider configuration
@@ -368,13 +367,13 @@ def tab_upload(tenant_id: str) -> None:
         type=["pdf", "docx", "xlsx", "xls", "csv", "tsv", "txt", "png", "jpg", "jpeg", "tiff", "bmp", "webp"],
     )
 
-    col_run, col_clear = st.columns([1, 5])
+    col_run, _ = st.columns([1, 5])
     run = col_run.button("▶ Run pipeline", type="primary", disabled=not files, use_container_width=True)
 
     if run and files:
         payloads = [{"filename": f.name, "content": f.getvalue()} for f in files]
         progress_bar = st.progress(0, text="Starting pipeline…")
-        status = st.empty()
+
 
         with st.spinner("Processing batch through 19 stages…"):
             t0 = time.monotonic()
@@ -477,7 +476,7 @@ def tab_results(tenant_id: str) -> None:
     # PDF / Email / JSON — these need the last batch report (richer than the flat grid).
     report = st.session_state.get("last_report")
     if report:
-        from mdi.eval.exports import to_pdf_bytes, to_email_html, to_json_bytes, to_eml_bytes
+        from mdi.eval.exports import to_email_html, to_eml_bytes, to_json_bytes, to_pdf_bytes
         col_pdf.download_button(
             "⬇ PDF",
             data=to_pdf_bytes(report, mode="detailed"),
@@ -653,6 +652,7 @@ def tab_evals(tenant_id: str) -> None:
 
     # Per-tenant thresholds — read from tenants.config["eval_thresholds"]
     import asyncio as _asyncio
+
     from sqlalchemy import text as _t
     async def _load_thresholds():
         async with tenant_session(tenant_id) as db:
@@ -718,7 +718,7 @@ def tab_admin() -> None:
     )
 
     available_packs = _admin_list_packs(admin_key)
-    pack_options = ["(open-vocabulary)"] + available_packs
+    pack_options = ["(open-vocabulary)", *available_packs]
 
     # --- List tenants ---
     st.markdown("### Tenants")
@@ -1029,10 +1029,12 @@ def tab_settings(tenant_id: str) -> None:
             "Real embedder is active. The first encode loads bge-m3 (~2GB, ~30s) "
             "and stays cached in process memory for the rest of the session."
         )
-        if not es["loaded"] and not es["loading"]:
-            if st.button("🔥 Warm the model now", type="secondary",
-                         help="Pay the cold-start cost now instead of letting the "
-                              "next upload absorb it."):
+        if (
+            not es["loaded"] and not es["loading"]
+            and st.button("🔥 Warm the model now", type="secondary",
+                          help="Pay the cold-start cost now instead of letting the "
+                               "next upload absorb it.")
+        ):
                 with st.spinner("Loading bge-m3 (~30s on CPU, faster on GPU)…"):
                     import httpx
                     try:
@@ -1088,7 +1090,7 @@ def _run_query(tenant_id: str, sql: str, **params: Any) -> list[dict[str, Any]]:
 
     try:
         return asyncio.run(go())
-    except Exception as e:  # noqa: BLE001
+    except Exception as e:
         st.error(f"DB unreachable: {e}")
         return []
 
@@ -1191,7 +1193,9 @@ def _post_merge_decision(tenant_id: str, proposal_id: str, decision: str) -> dic
     Bypasses the HTTP API for simplicity in local-only mode.
     """
     import asyncio
+
     from sqlalchemy import text as _sa_text
+
     from mdi.brain.knowledge_graph import KnowledgeGraph
 
     async def _run():

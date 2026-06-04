@@ -47,6 +47,6 @@ celery_app = get_celery()
 def run_batch(tenant_id: str, document_payloads: list[dict[str, Any]]) -> dict[str, Any]:
     """Phase-1 placeholder. Real wiring in Phase 4 calls
     `mdi.orchestrator.pipeline.run` and returns the BatchReport JSON."""
-    from mdi.orchestrator.pipeline import run_batch_async  # noqa: PLC0415  — lazy import
+    from mdi.orchestrator.pipeline import run_batch_async
 
     return asyncio.run(run_batch_async(tenant_id=tenant_id, payloads=document_payloads))

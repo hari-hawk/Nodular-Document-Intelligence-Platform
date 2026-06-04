@@ -1,0 +1,134 @@
+name: Live LLM tests
+
+# Manual-trigger workflow that exercises the real provider chain
+# (Gemini primary -> Claude fallback) against tests/live_llm/. NOT part
+# of CI on every push - these tests cost real money. To run:
+#
+#   GitHub UI -> Actions -> "Live LLM tests" -> Run workflow -> branch
+#
+# Required repository secrets:
+#   GOOGLE_API_KEY     - Gemini key (primary provider)
+#   ANTHROPIC_API_KEY  - Claude key (fallback provider; without it the
+#                        fallback test self-skips, the others run on Gemini)
+#
+# Cost ceiling: tests collectively spend ~$0.10-0.20 per run. The provider
+# router enforces DAILY_SPEND_CAP_USD; we set 5.00 here as belt-and-braces.
+
+on:
+  workflow_dispatch:
+    inputs:
+      pytest_args:
+        description: "Extra args for pytest (e.g. -k provider_fallback)"
+        required: false
+        default: ""
+
+concurrency:
+  group: live-llm-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  live-llm:
+    name: Real provider chain
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    services:
+      postgres:
+        image: pgvector/pgvector:pg15
+        env:
+          POSTGRES_USER: mdi
+          POSTGRES_PASSWORD: mdi
+          POSTGRES_DB: mdi
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U mdi -d mdi"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+
+    env:
+      DATABASE_URL: "postgresql+psycopg://mdi_app:mdi_app@localhost:5432/mdi"
+      DATABASE_URL_ADMIN_SYNC: "postgresql://mdi:mdi@localhost:5432/mdi"
+      DATABASE_URL_ADMIN: "postgresql+psycopg://mdi:mdi@localhost:5432/mdi"
+      GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      MDI_USE_REAL_EMBEDDINGS: "false"
+      DAILY_SPEND_CAP_USD: "5.00"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+          cache-dependency-path: |
+            pyproject.toml
+
+      - name: Install project (with dev extras)
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+
+      - name: Bootstrap Postgres (extensions + mdi_app role)
+        env:
+          PGPASSWORD: mdi
+        run: |
+          for i in {1..30}; do
+            if psql -h localhost -U mdi -d mdi -c "SELECT 1" >/dev/null 2>&1; then
+              break
+            fi
+            echo "Waiting for postgres ($i/30)..."
+            sleep 2
+          done
+
+          psql -h localhost -U mdi -d mdi <<'SQL'
+          CREATE EXTENSION IF NOT EXISTS vector;
+          CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+          CREATE EXTENSION IF NOT EXISTS pg_trgm;
+
+          DO $$
+          BEGIN
+            IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'mdi_app') THEN
+              CREATE ROLE mdi_app LOGIN PASSWORD 'mdi_app' NOSUPERUSER NOBYPASSRLS;
+            END IF;
+          END$$;
+
+          GRANT CONNECT ON DATABASE mdi TO mdi_app;
+          GRANT USAGE ON SCHEMA public TO mdi_app;
+          GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO mdi_app;
+          GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO mdi_app;
+          ALTER DEFAULT PRIVILEGES IN SCHEMA public
+            GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO mdi_app;
+          ALTER DEFAULT PRIVILEGES IN SCHEMA public
+            GRANT USAGE, SELECT ON SEQUENCES TO mdi_app;
+          SQL
+
+      - name: Run alembic migrations
+        run: alembic upgrade head
+
+      - name: Re-grant mdi_app on tables created by alembic
+        env:
+          PGPASSWORD: mdi
+        run: |
+          psql -h localhost -U mdi -d mdi <<'SQL'
+          GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO mdi_app;
+          GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO mdi_app;
+          SQL
+
+      - name: Pytest with --run-live
+        env:
+          # Quoting via env: + "$VAR" prevents shell injection from the
+          # workflow_dispatch input. Word-splitting is still allowed so users
+          # can pass multi-token args like "-k pattern -x"; only people with
+          # repo write access can dispatch this workflow.
+          PYTEST_EXTRA: ${{ inputs.pytest_args }}
+        run: |
+          if [ -z "$GOOGLE_API_KEY" ]; then
+            echo "::error::GOOGLE_API_KEY secret is empty - cannot run live tests."
+            exit 1
+          fi
+          # shellcheck disable=SC2086
+          pytest -q --run-live tests/live_llm $PYTEST_EXTRA

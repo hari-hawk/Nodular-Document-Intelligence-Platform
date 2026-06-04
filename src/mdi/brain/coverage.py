@@ -38,10 +38,7 @@ def classify_groups(
         else:
             anchor = bool(types_seen & {"contract", "purchase_order"})
             settle = bool(types_seen & {"invoice", "statement", "receipt"})
-            if anchor and settle:
-                coverage = "full"
-            else:
-                coverage = "partial"
+            coverage = "full" if anchor and settle else "partial"
         out.append(g.model_copy(update={"coverage": coverage}))
     return out
 
@@ -77,7 +74,7 @@ def discover_groups(
         used.update(unique)
 
     # Orphans
-    for doc_id_str in extractions.keys():
+    for doc_id_str in extractions:
         if doc_id_str in used:
             continue
         counter += 1

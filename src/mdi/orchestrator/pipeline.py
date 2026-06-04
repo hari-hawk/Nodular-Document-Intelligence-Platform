@@ -25,7 +25,7 @@ from __future__ import annotations
 
 import asyncio
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from mdi.brain import (
@@ -36,8 +36,8 @@ from mdi.brain import (
     eyes,
     graph_builder,
     hands,
-    insight_cortex,
     inner_voice,
+    insight_cortex,
     narrator,
     pattern_cortex,
 )
@@ -50,9 +50,15 @@ from mdi.kernel.observability import get_logger
 from mdi.kernel.settings import get_settings
 from mdi.models.db import (
     Anomaly as AnomalyRow,
+)
+from mdi.models.db import (
     AuditEvent,
     Batch,
+)
+from mdi.models.db import (
     Document as DocumentRow,
+)
+from mdi.models.db import (
     Extraction as ExtractionRow,
 )
 from mdi.models.schemas import (
@@ -96,7 +102,7 @@ async def run_batch_async(
     s = get_settings()
     semaphore = asyncio.Semaphore(s.organ_concurrency)
     bus = ProgressBus()
-    started = datetime.now(timezone.utc)
+    started = datetime.now(UTC)
     tid = uuid.UUID(str(tenant_id))
     gw = gateway or get_gateway()
     # `Hippocampus()` with no arg defers to settings.use_real_embeddings
@@ -112,14 +118,14 @@ async def run_batch_async(
     stage_evals: list[dict[str, Any]] = []
 
     # Lazy import to avoid circular dependency.
-    from mdi.eval.stage_eval import make_eval as _make_eval  # noqa: PLC0415
+    from mdi.eval.stage_eval import make_eval as _make_eval
 
     # Per-tenant EvalLayer thresholds (Option A). Read once per batch from
     # tenants.config JSONB; missing keys fall back to the per-stage default.
     tenant_thresholds: dict[str, float] = {}
     if persist:
         try:
-            from sqlalchemy import text as _sql_text  # noqa: PLC0415
+            from sqlalchemy import text as _sql_text
             async with tenant_session(tid) as _db:
                 _row = (await _db.execute(
                     _sql_text("SELECT config FROM tenants WHERE id = :tid"),
@@ -127,7 +133,7 @@ async def run_batch_async(
                 )).first()
                 if _row and _row.config:
                     tenant_thresholds = (_row.config or {}).get("eval_thresholds", {}) or {}
-        except Exception:  # noqa: BLE001
+        except Exception:
             tenant_thresholds = {}
 
     assess_classify = _make_eval("classify",         tenant_thresholds=tenant_thresholds)
@@ -213,7 +219,7 @@ async def run_batch_async(
             # downstream consumer (DB, API, exports, UI) sees one canonical
             # name per concept. Schema (Pattern Cortex output) keeps raw
             # names — Patterns tab is meant to show what the brain saw.
-            from mdi.brain._canonical_fields import normalize_extraction  # noqa: PLC0415
+            from mdi.brain._canonical_fields import normalize_extraction
             ex = normalize_extraction(ex)
             await bus.publish(7, "extracted", f"{len(ex.fields)} fields", cost_usd=ex.cost_usd)
             # EvalLayer: extraction quality
@@ -368,7 +374,7 @@ async def run_batch_async(
             partial_report = BatchReport(
                 tenant_id=tid,
                 started_at=started,
-                finished_at=datetime.now(timezone.utc),
+                finished_at=datetime.now(UTC),
                 documents=documents,
                 clusters=clusters,
                 extractions=extractions,
@@ -386,7 +392,7 @@ async def run_batch_async(
             isolated=graph_delta.isolated_nodes,
         ).model_dump(mode="json"))
 
-    finished = datetime.now(timezone.utc)
+    finished = datetime.now(UTC)
     await bus.publish(16, "report", "assembled")
 
     # Total cost = every LLM call routed through the gateway during this

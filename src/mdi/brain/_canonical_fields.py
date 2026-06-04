@@ -22,10 +22,9 @@ winning field; the losing field is dropped.
 """
 from __future__ import annotations
 
-from typing import Mapping
+from collections.abc import Mapping
 
 from mdi.models.schemas import Extraction, FieldExtraction
-
 
 # Alias map — left side = raw LLM emission, right side = canonical name.
 # Add new aliases here, not in the orchestrator or the UI.

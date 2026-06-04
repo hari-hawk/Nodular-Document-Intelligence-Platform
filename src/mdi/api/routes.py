@@ -1,25 +1,22 @@
 """Routes — process / report / chat / correction / tenant usage + admin onboarding."""
 from __future__ import annotations
 
-import base64
 import uuid
 from typing import Any
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 from pydantic import BaseModel, Field
 from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from mdi.api.deps import authenticate, current_tenant, db_session, require_admin
+from mdi.brain.chat import chat as chat_layer
 from mdi.brain.hippocampus import Hippocampus
 from mdi.brain.knowledge_graph import KnowledgeGraph
-from mdi.brain.chat import chat as chat_layer
 from mdi.kernel.auth import generate_api_key, get_engine
 from mdi.kernel.observability import get_logger
 from mdi.models.db import (
-    ApiKey,
     Batch,
-    Correction as CorrectionRow,
     CostEvent,
     Tenant,
 )
@@ -299,6 +296,7 @@ async def architecture_overview():
     404s as long as the source exists).
     """
     from pathlib import Path
+
     from fastapi.responses import HTMLResponse, PlainTextResponse
 
     # mdi/src/mdi/api/routes.py → mdi/  is parents[3]
@@ -395,6 +393,7 @@ async def admin_embeddings_warm() -> dict[str, Any]:
     Returns immediately with current status if the model is already loaded.
     """
     import time as _time
+
     from mdi.brain.hippocampus import _load_real_model, embedder_status
 
     before = embedder_status()
@@ -429,7 +428,7 @@ async def admin_get_pack(slug: str) -> dict[str, Any]:
     try:
         pack = load_pack(slug)
     except PackError as e:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, str(e))
+        raise HTTPException(status.HTTP_404_NOT_FOUND, str(e)) from e
 
     # Schema + doc types (always present).
     schema = pack.field_schema()
@@ -627,5 +626,5 @@ async def admin_issue_api_key(
     }
 
 
-# noqa anchor - keeps `authenticate` re-exportable.
+
 _ = authenticate

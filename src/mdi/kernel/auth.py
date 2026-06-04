@@ -6,12 +6,14 @@ Every API handler that reads or writes tenant data MUST go through it.
 """
 from __future__ import annotations
 
+import contextlib
 import hashlib
 import secrets
 import uuid
+from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
-from datetime import datetime, timedelta, timezone
-from typing import Any, AsyncIterator
+from datetime import UTC, datetime, timedelta
+from typing import Any
 
 import jwt
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, create_async_engine
@@ -32,7 +34,7 @@ class AuthError(RuntimeError):
 # ---------------------------------------------------------------------------
 def issue_jwt(*, tenant_id: uuid.UUID, subject: str, extra: dict[str, Any] | None = None) -> str:
     s = get_settings()
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     payload: dict[str, Any] = {
         "iss": "mdi",
         "sub": subject,
@@ -131,13 +133,14 @@ async def tenant_session(tenant_id: uuid.UUID | str) -> AsyncIterator[AsyncSessi
         finally:
             # Defense in depth — clear the GUC on the way out so pooled
             # connections never serve cross-tenant rows by accident.
-            try:
+            # Bare Exception suppression is intentional: the connection
+            # may already be in error state and we don't want the cleanup
+            # to mask the original error from the caller.
+            with contextlib.suppress(Exception):
                 await session.execute(
                     _set_config_stmt(),
                     {"key": "app.tenant_id", "value": "", "is_local": False},
                 )
-            except Exception:
-                pass  # connection may already be in error state
 
 
 def _set_config_stmt() -> Any:

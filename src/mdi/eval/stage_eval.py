@@ -24,6 +24,8 @@ from dataclasses import dataclass
 from typing import Any, Literal
 from uuid import UUID
 
+from pydantic import Field
+
 from mdi.models.schemas import (
     Cluster,
     Extraction,
@@ -55,7 +57,9 @@ class StageEvalResult(StrictModel):
     passed: bool
     severity: Severity = "MEDIUM"
     checks: list[Check]
-    attributes: dict[str, Any] = {}
+    # Pydantic v2 model field — Pydantic deep-copies defaults per instance,
+    # so the dict is not mutably shared. ruff false positive; silence via Field.
+    attributes: dict[str, Any] = Field(default_factory=dict)
 
 
 # ---------------------------------------------------------------------------
