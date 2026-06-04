@@ -3,12 +3,61 @@ from __future__ import annotations
 
 import json
 import re
+from typing import Any
 
+from mdi.brain.content_signals import SignalMatch, detect_packs
 from mdi.kernel.llm_gateway import GatewayLike, get_gateway
 from mdi.kernel.observability import get_logger
 from mdi.models.schemas import Cluster, IngestedDocument
 
 logger = get_logger(__name__)
+
+
+def _content_signal_match(doc: IngestedDocument) -> SignalMatch | None:
+    """Best content-signal match across all loaded packs, or None.
+
+    Errors during pack-loading are swallowed — content_signals is a
+    speed-up, never load-bearing for correctness. The LLM path is the
+    fallback for every failure mode here.
+    """
+    try:
+        from mdi.kernel.pack_loader import list_packs, load_pack
+        available: dict[str, dict[str, Any]] = {}
+        for slug in list_packs():
+            try:
+                pack = load_pack(slug)
+                available[slug] = pack.manifest
+            except Exception:
+                continue
+        first_pages = "\n".join((doc.pages or [])[:2]) or (doc.text or "")
+        matches = detect_packs(
+            text=doc.text,
+            available_packs=available,
+            first_pages_text=first_pages,
+        )
+        return matches[0] if matches else None
+    except Exception as e:
+        logger.warning("eyes.content_signal_error", error=str(e))
+        return None
+
+
+def _industry_from_pack(pack_slug: str) -> str:
+    """Map a pack slug to its industry name. Falls back to the slug
+    itself if the loader fails — at worst we get a slightly off
+    industry label, which is fine because the slug uniquely identifies
+    the pack downstream."""
+    try:
+        from mdi.kernel.pack_loader import load_pack
+        manifest = load_pack(pack_slug).manifest
+        return str(manifest.get("industry") or pack_slug)
+    except Exception:
+        return pack_slug
+
+
+def _vendor_from_signal(match: SignalMatch) -> str | None:
+    """Prefer the first matched required_any phrase as the vendor name;
+    falls back to None so Eyes' caller can mark vendor unknown."""
+    return match.matched_phrases[0] if match.matched_phrases else None
 
 SYSTEM_PROMPT = """You are the perception organ of an open-vocabulary document intelligence system.
 Classify the document by inspecting its content. Detect:
@@ -71,6 +120,22 @@ async def classify(
     body = (doc.text or "")[:8000]
     if not body and not doc.images:
         return _heuristic_cluster(doc)
+
+    # Content-signal short-circuit (Wave 1.3): if any pack's content_signals
+    # match the document with ≥0.90 confidence, skip the LLM call entirely.
+    # ≥0.75 (vendor-confident but no doc_type marker) still hits the LLM —
+    # the vendor is right but we want the model to pick the doc_type.
+    sig_match = _content_signal_match(doc)
+    if sig_match and sig_match.confidence >= 0.90:
+        return Cluster(
+            industry=_industry_from_pack(sig_match.pack_slug),
+            vendor=_vendor_from_signal(sig_match) or "unknown",
+            doc_type=sig_match.doc_type_hint or "unknown",
+            layout="scanned" if doc.needs_vision else "free_text",
+            language="en",
+            confidence=sig_match.confidence,
+            rationale=f"content_signals[{sig_match.pack_slug}]: {sig_match.rationale}",
+        )
 
     prompt = f"FILENAME: {doc.filename}\n\nCONTENT:\n{body}\n"
     try:
