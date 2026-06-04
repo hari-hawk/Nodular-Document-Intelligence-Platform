@@ -383,7 +383,17 @@ async def run_batch_async(
     # ------------------------------------------------------------------
     # Phase 2 — batch
     # ------------------------------------------------------------------
-    insights = await insight_cortex.analyse(list(extractions.values()), anomalies, gateway=gw)
+    # Wave 2.2 — pass clusters + extractions-by-doc so the deterministic
+    # detectors (recurring vendors / pricing anomalies / expirations) can
+    # run alongside the existing LLM-free insight helpers. Findings come
+    # back in the same `Insight` shape so downstream consumers don't care
+    # which path produced them.
+    insights = await insight_cortex.analyse(
+        list(extractions.values()), anomalies,
+        gateway=gw,
+        clusters=clusters,
+        extractions_by_doc=extractions,
+    )
     await bus.publish(10, "insights", f"{len(insights)}")
     # EvalLayer: insight quality
     stage_evals.append(assess_insights.evaluate(list(extractions.values()), insights).model_dump(mode="json"))

@@ -133,11 +133,27 @@ async def analyse(
     anomalies: list[Anomaly],
     *,
     gateway: GatewayLike | None = None,
+    clusters: dict | None = None,
+    extractions_by_doc: dict | None = None,
 ) -> list[Insight]:
     insights: list[Insight] = []
     insights.extend(_trend_insights(extractions))
     insights.extend(_cross_doc_insights(extractions))
     insights.extend(_risk_insights(anomalies))
+
+    # Wave 2.2 — deterministic detectors. The orchestrator passes
+    # clusters/extractions_by_doc when available (Phase 2 of the
+    # pipeline); legacy callers that only have flat lists still work
+    # because the detectors are no-op when their inputs are absent.
+    if clusters and extractions_by_doc:
+        from mdi.brain.detectors import (
+            detect_expirations,
+            detect_pricing_anomalies,
+            detect_recurring_vendors,
+        )
+        insights.extend(detect_recurring_vendors(clusters))
+        insights.extend(detect_pricing_anomalies(clusters, extractions_by_doc))
+        insights.extend(detect_expirations(clusters, extractions_by_doc))
 
     severity_order = {"HIGH": 0, "MEDIUM": 1, "LOW": 2, "INFO": 3}
     insights.sort(key=lambda i: severity_order.get(i.severity, 9))
