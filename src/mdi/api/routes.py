@@ -101,6 +101,21 @@ async def post_correction(
         corrected_value=payload.corrected_value,
         note=payload.note,
     )
+    # Wave 2.3 — embed the correction immediately so the next document
+    # from a similar context can be hinted via semantic recall. Failure
+    # here is non-fatal: the exact-match path still works without an
+    # embedding, and a backfill job re-embeds older corrections.
+    try:
+        await hippo.embed_correction(
+            db, tenant.id,
+            correction_id=cid,
+            industry=payload.industry, vendor=payload.vendor,
+            doc_type=payload.doc_type, field_path=payload.field_path,
+            extracted_value=payload.extracted_value,
+            corrected_value=payload.corrected_value,
+        )
+    except Exception as e:
+        logger.warning("correction.embed_failed", correction_id=str(cid), error=str(e))
     await db.commit()
     return {"correction_id": str(cid)}
 

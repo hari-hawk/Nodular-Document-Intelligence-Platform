@@ -260,7 +260,26 @@ class Hippocampus:
         db: AsyncSession,
         tenant_id: uuid.UUID,
         cluster: Cluster,
+        *,
+        include_semantic: bool = True,
+        semantic_top_k: int = 5,
+        semantic_threshold: float = 0.75,
     ) -> list[CorrectionHint]:
+        """Two-tier correction recall.
+
+        Tier 1 (always): exact match on (industry, vendor, doc_type).
+        Tier 2 (Wave 2.3, default-on): semantic ANN over corrections.embedding
+          when the exact tier yields nothing or when `include_semantic=True`.
+          Semantic hits are appended AFTER exact matches and deduped by
+          (field_path, corrected_value) so the same advice doesn't appear
+          twice when both tiers fire.
+
+        The semantic tier is the cure for the "Eyes called it AT&T last
+        time and AT&T Business Services this time" failure mode — a
+        correction made when the vendor was emitted one way still surfaces
+        when the SAME vendor is later emitted a different way.
+        """
+        # Tier 1 — exact scope match (the existing behaviour).
         rows = (
             await db.execute(
                 select(CorrectionRow).where(
@@ -270,7 +289,7 @@ class Hippocampus:
                 )
             )
         ).scalars().all()
-        return [
+        hints: list[CorrectionHint] = [
             CorrectionHint(
                 field_path=r.field_path,
                 extracted_value=r.extracted_value,
@@ -280,6 +299,137 @@ class Hippocampus:
             )
             for r in rows
         ]
+
+        if not include_semantic:
+            return hints
+
+        # Tier 2 — vector ANN. Embed the cluster's context sentence and
+        # find corrections whose stored sentence is semantically close.
+        # Dedup against tier-1 hits so the same correction isn't duplicated.
+        seen = {(h.field_path, h.corrected_value) for h in hints}
+        semantic_hits = await self.lookup_corrections_semantic(
+            db, tenant_id, cluster,
+            top_k=semantic_top_k,
+            threshold=semantic_threshold,
+        )
+        for h in semantic_hits:
+            key = (h.field_path, h.corrected_value)
+            if key in seen:
+                continue
+            seen.add(key)
+            hints.append(h)
+        return hints
+
+    async def lookup_corrections_semantic(
+        self,
+        db: AsyncSession,
+        tenant_id: uuid.UUID,
+        cluster: Cluster,
+        *,
+        top_k: int = 5,
+        threshold: float = 0.75,
+    ) -> list[CorrectionHint]:
+        """Pure-vector recall over corrections.embedding.
+
+        The query embedding comes from the cluster_text (same shape as
+        the patterns table embeds), which means a future cluster with
+        "AT&T Business Services" can hit corrections written for "AT&T"
+        — the embedding distance is small.
+
+        Returns CorrectionHint regardless of whether the stored row had
+        an embedding. Rows with `embedding IS NULL` are silently skipped;
+        a separate backfill job will re-embed older corrections.
+        """
+        from sqlalchemy import text as sql_text
+        emb_literal = (
+            "[" + ",".join(format(x, ".7f") for x in self.embed(cluster)) + "]"
+        )
+        rows = (
+            await db.execute(
+                sql_text(
+                    """
+                    SELECT field_path, extracted_value, corrected_value, note,
+                           agreement_count,
+                           1 - (embedding <=> CAST(:vec AS vector)) AS sim
+                    FROM corrections
+                    WHERE embedding IS NOT NULL
+                    ORDER BY embedding <=> CAST(:vec AS vector)
+                    LIMIT :limit
+                    """
+                ),
+                {"vec": emb_literal, "limit": int(top_k)},
+            )
+        ).all()
+        return [
+            CorrectionHint(
+                field_path=r.field_path,
+                extracted_value=r.extracted_value,
+                corrected_value=r.corrected_value,
+                note=(r.note or ""),
+                agreement_count=r.agreement_count,
+            )
+            for r in rows
+            if r.sim >= threshold
+        ]
+
+    async def embed_correction(
+        self,
+        db: AsyncSession,
+        tenant_id: uuid.UUID,
+        *,
+        correction_id: uuid.UUID,
+        industry: str,
+        vendor: str,
+        doc_type: str,
+        field_path: str,
+        extracted_value: str | None,
+        corrected_value: str,
+    ) -> None:
+        """Compute + persist the embedding for a single correction row.
+
+        The synthesis sentence ports DD's "Option C" (full context) format:
+        carrier + doc_type + field + before/after. That gave them the
+        most actionable recall — vector hits are likely to be ACTUALLY
+        relevant when the embedded sentence carries the full scope.
+        """
+        sentence = self._correction_sentence(
+            industry=industry, vendor=vendor, doc_type=doc_type,
+            field_path=field_path,
+            extracted_value=extracted_value, corrected_value=corrected_value,
+        )
+        emb = self.embedder.embed(sentence)
+        from sqlalchemy import text as sql_text
+        emb_literal = "[" + ",".join(format(x, ".7f") for x in emb) + "]"
+        await db.execute(
+            sql_text(
+                "UPDATE corrections SET embedding = CAST(:vec AS vector) "
+                "WHERE id = :id"
+            ),
+            {"vec": emb_literal, "id": str(correction_id)},
+        )
+
+    @staticmethod
+    def _correction_sentence(
+        *,
+        industry: str,
+        vendor: str,
+        doc_type: str,
+        field_path: str,
+        extracted_value: str | None,
+        corrected_value: str,
+    ) -> str:
+        """Build the embeddable context sentence for a correction.
+
+        The shape is intentionally English-prose — bge-m3 embeds natural
+        language more reliably than token-soup KV-pair strings. Keeping
+        the sentence under ~256 chars stays well within the embedder's
+        ideal window.
+        """
+        ex = extracted_value if extracted_value is not None else "(no value)"
+        return (
+            f"{industry} {doc_type} from {vendor}: field {field_path} "
+            f"was extracted as {ex} but corrected to {corrected_value}"
+        )
 
     async def write_pattern(
         self,
