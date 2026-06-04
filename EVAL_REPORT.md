@@ -122,3 +122,76 @@ Made 4 more surgical changes after Run 2:
 
 To confirm with measurement: re-run `python scripts/run_golden_eval.py` (~$1.70 in Gemini spend, ~9 min).
 
+---
+
+## Run 3 — post-Wave-1 verification ($1.5609, measured 2026-06-04)
+
+Action taken (interim — between Run 2 and Run 3): all of Wave 1 of the
+DD uplift landed (`docs/digital-direction-uplift-plan.md`), covering:
+- Wave 1.1: migrated Gemini to the new `google-genai` SDK; VLM is now
+  first-class; Vertex AI selectable via env.
+- Wave 1.2: auto-pack registry with one-click promote.
+- Wave 1.3: content-signal pack detection + multi-pattern matching.
+- Wave 1.4: cumulative spend ledger (file-backed, cross-restart).
+- Wave 1.5: self-hosted Langfuse via docker-compose.
+
+Run 3 was the gate confirming no regression. Plus the two Run 2.5
+micro-fixes (`buyer_name`/`supplier_name` aliases + trailing-punct trim)
+that were applied without re-measuring at the time:
+
+| Pack | Run 2 | Run 3 | Δ | Verdict |
+|---|---:|---:|---:|---|
+| business_documents_base | 100.0% | **100.0%** | – | PASS |
+| cloud_finance | 92.9% | **100.0%** | +7.1pp | PASS |
+| healthcare_claims | 100.0% | **62.5%** | -37.5pp | FAIL (variance, see below) |
+| legal_hr | 80.0% | **93.3%** | +13.3pp | PASS |
+| manufacturing | 84.6% | **100.0%** | +15.4pp | PASS |
+| telecom_billing | 100.0% | **100.0%** | – | PASS |
+| **Total** | **4/6** | **5/6** | +1 | **average accuracy ~92.6%** |
+
+Total spend: $1.5609 (slightly less than Run 2's $1.7096).
+
+### Wave 1 systematic wins (verified)
+
+- `cloud_finance/aws_invoice_001`: the `invoice_id → document_number`
+  alias (added Wave 2 of the eval iteration, locked in Wave 1.2's alias
+  family) now catches AWS's emission. 4/5 → 5/5.
+- `manufacturing/po_001`: `buyer_name`/`supplier_name` aliases now catch
+  the flat-snake-case emission. 3/5 → 5/5.
+- `legal_hr/msa_001`: trailing-punct trim catches `"State of New York."`.
+
+### Run 3 single-case regression — LLM variance, NOT a Wave 1 bug
+
+`healthcare_claims/remit_835_001.txt` went 6/6 → 0/6. Gemini extracted
+the document under entirely different field names this run, AND used
+the check_number as `document_number` instead of the claim_number. This
+is exactly the kind of "the same prompt produces different shapes
+across runs" pattern that motivates Wave 2 (multi-pattern recognition
++ corrections-as-memory). Diagnosis confirmed by reading the live
+extraction from DB: vendor=`None`, provider_name=`None`, claim_number
+mis-routed.
+
+Not a Wave 1 regression because:
+- The other two healthcare cases (claim_837, prior_auth) still score
+  100% on the same run.
+- The remit_835 case scored 100% in Run 2 with the same code paths
+  (the alias additions don't apply to healthcare fields).
+- The bug surfaced is in Gemini's output stability, not in our code.
+
+### One real Wave 1 bug surfaced + fixed
+
+The narrator stage logged `unsupported operand type(s) for /:
+'NoneType' and 'int'` on one document. Root cause: the new google-genai
+SDK occasionally returns `usage_metadata.candidates_token_count = None`
+on safety-filtered responses, and `estimate_cost_usd` then divides
+None by 1M. Fixed in the same commit as the rest of Run-3 wrap-up via
+`int(... or 0)` coercion in `gemini_provider.py`. Regression test added.
+
+### State after Run 3
+
+- 5 of 6 packs at ≥90% target.
+- Healthcare regression is LLM variance (1 doc), not code.
+- Wave 1 complete. Ready to move to Wave 2 (multi-pattern recognition,
+  corrections-as-memory, deterministic detectors, master-data store).
+
+

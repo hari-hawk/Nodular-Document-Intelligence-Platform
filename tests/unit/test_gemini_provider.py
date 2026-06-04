@@ -181,6 +181,44 @@ async def test_missing_creds_raises_provider_not_configured(monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_none_token_counts_coerced_to_zero(monkeypatch):
+    """The new google-genai SDK can return usage_metadata with None-valued
+    token counts (observed on safety-filtered responses). Downstream cost
+    math does `tokens / 1_000_000` which throws on None — the provider
+    must coerce None to 0 so a safety-filtered call doesn't crash the
+    pipeline (the response.text is still returned). Regression guard for
+    a bug introduced + fixed in Wave 1.6 of the DD uplift."""
+    monkeypatch.setenv("GOOGLE_API_KEY", "fake-key")
+    monkeypatch.delenv("VERTEX_PROJECT", raising=False)
+    _install_fake_genai(monkeypatch)
+
+    # Simulate the SDK returning usage_metadata.candidates_token_count = None
+    response_with_none = MagicMock()
+    response_with_none.text = ""
+    response_with_none.usage_metadata = types.SimpleNamespace(
+        prompt_token_count=12,
+        candidates_token_count=None,  # ← the actual bug surface
+    )
+
+    p = GeminiProvider()
+    with patch.object(p, "_build_client") as build:
+        client = MagicMock()
+        client.aio.models.generate_content = AsyncMock(return_value=response_with_none)
+        build.return_value = client
+
+        result = await p.call(
+            model="gemini-2.5-flash", prompt="hi", system=None,
+            images=[], json_mode=False, max_output_tokens=None, temperature=0.0,
+        )
+
+    # None coerced to 0; the result is still usable downstream.
+    assert result.input_tokens == 12
+    assert result.output_tokens == 0
+    # And the value is a real int, not None, so estimate_cost_usd works.
+    assert isinstance(result.output_tokens, int)
+
+
+@pytest.mark.asyncio
 async def test_sdk_error_wrapped_as_provider_error(monkeypatch):
     """Any exception from the SDK gets surfaced as ProviderError — which
     is in the retryable_exceptions set so the gateway retries / falls

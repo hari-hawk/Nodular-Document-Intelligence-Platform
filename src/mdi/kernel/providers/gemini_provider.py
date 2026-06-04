@@ -137,8 +137,15 @@ class GeminiProvider(BaseProvider):
 
         text = getattr(resp, "text", "") or ""
         usage = getattr(resp, "usage_metadata", None)
-        in_tok = getattr(usage, "prompt_token_count", 0) if usage else 0
-        out_tok = getattr(usage, "candidates_token_count", 0) if usage else 0
+        # The new google-genai SDK occasionally returns `usage_metadata`
+        # with None-valued token fields (observed on safety-filtered
+        # responses where `candidates_token_count` is set to None rather
+        # than 0). Downstream `estimate_cost_usd` does `tokens / 1_000_000`
+        # which raises `unsupported operand type(s) for /: 'NoneType' and
+        # 'int'`. The `or 0` coerces None and missing both to 0 — a
+        # safety-filtered call legitimately produced zero output tokens.
+        in_tok = int(getattr(usage, "prompt_token_count", 0) or 0) if usage else 0
+        out_tok = int(getattr(usage, "candidates_token_count", 0) or 0) if usage else 0
         return ProviderCallResult(text=text, raw=resp, input_tokens=in_tok, output_tokens=out_tok)
 
     def retryable_exceptions(self) -> tuple[type[BaseException], ...]:
