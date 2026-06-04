@@ -37,7 +37,10 @@ dependencies = [
     "pgvector>=0.3",
 
     # LLM
-    "google-generativeai>=0.7",
+    # New unified Google SDK (replaces deprecated google-generativeai). Supports
+    # both AI Studio (api_key auth) and Vertex AI (ADC / service-account auth)
+    # through a single Client; backend chosen by `vertex_project` setting.
+    "google-genai>=2.0",
     "tenacity>=8.5",
 
     # Embeddings (loaded lazily — heavy)

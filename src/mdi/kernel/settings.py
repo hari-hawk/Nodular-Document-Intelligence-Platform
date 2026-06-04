@@ -17,6 +17,19 @@ class Settings(BaseSettings):
     google_api_key: str = ""
     gemini_model_flash: str = "gemini-2.5-flash"
     gemini_model_pro: str = "gemini-2.5-pro"
+    # Backend selection: empty `vertex_project` → AI Studio (api_key auth).
+    # Set vertex_project + vertex_location → Vertex AI (ADC / service account
+    # auth, more reliable for production: regional endpoints, IAM, no key
+    # rotation). The new google-genai SDK supports both backends.
+    vertex_project: str = ""
+    vertex_location: str = "us-central1"
+    # Optional explicit service-account JSON path. If empty, ADC is used
+    # (gcloud auth application-default login, GOOGLE_APPLICATION_CREDENTIALS,
+    # GKE workload identity, etc.).
+    vertex_credentials_path: str = ""
+    # Vision (VLM) model override. Empty → fall back to gemini_model_pro
+    # for image-bearing calls (newer Gemini tiers support vision natively).
+    gemini_vision_model: str = ""
 
     # LLM — Anthropic
     anthropic_api_key: str = ""

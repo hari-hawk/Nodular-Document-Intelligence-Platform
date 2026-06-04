@@ -1,7 +1,20 @@
-"""Google Gemini adapter.
+"""Google Gemini adapter — new `google-genai` SDK (2.x).
 
-Lazy-imports `google.generativeai` so test environments without the
-package can still load this module.
+Migrated from the deprecated `google.generativeai` package. The new SDK
+supports BOTH AI Studio (api_key auth) and Vertex AI (ADC / service
+account auth) through a single `Client` — selected here by env:
+
+    vertex_project=""                   → AI Studio (legacy default)
+    vertex_project="my-gcp-project"     → Vertex AI
+
+Vision (VLM) inputs are passed as ``types.Part.from_bytes(...)`` parts in
+the request. The router already flips ``IngestedDocument.needs_vision``
+based on mime type / heuristics; this provider routes any call with
+non-empty ``images`` through the vision-capable model
+(``settings.gemini_vision_model`` if set, else ``gemini_model_pro``).
+
+Lazy-imports the SDK so test environments without the package can still
+load this module via FakeGateway.
 """
 from __future__ import annotations
 
@@ -11,6 +24,7 @@ from typing import Any
 from mdi.kernel.providers.base import (
     BaseProvider,
     ProviderCallResult,
+    ProviderError,
     ProviderNotConfigured,
     register_provider,
 )
@@ -23,6 +37,55 @@ class GeminiProvider(BaseProvider):
     supports_json_mode = True
     supports_tools = True
 
+    def _build_client(self) -> Any:
+        """Construct a google.genai Client targeting AI Studio or Vertex.
+
+        Imported lazily so the test harness doesn't pay the SDK import
+        cost (and so a missing dependency on a stripped image errors at
+        call time, not module import).
+        """
+        s = get_settings()
+        from google import genai  # type: ignore[import-not-found]
+
+        if s.vertex_project:
+            # Vertex AI path — IAM auth via ADC or explicit service-account JSON.
+            kwargs: dict[str, Any] = {
+                "vertexai": True,
+                "project": s.vertex_project,
+                "location": s.vertex_location,
+            }
+            if s.vertex_credentials_path:
+                # The SDK reads GOOGLE_APPLICATION_CREDENTIALS from the env if
+                # set, so we surface the configured path the same way without
+                # forcing the caller to also export it shell-side.
+                import os
+                os.environ.setdefault(
+                    "GOOGLE_APPLICATION_CREDENTIALS", s.vertex_credentials_path,
+                )
+            return genai.Client(**kwargs)
+
+        # AI Studio path — api_key auth (matches the legacy provider behaviour).
+        if not s.google_api_key:
+            raise ProviderNotConfigured(
+                "Neither vertex_project nor google_api_key is set. "
+                "Set GOOGLE_API_KEY for AI Studio, or VERTEX_PROJECT for Vertex AI."
+            )
+        return genai.Client(api_key=s.google_api_key)
+
+    def _select_model(self, requested: str, has_images: bool) -> str:
+        """Vision calls get redirected to the vision-capable model when
+        the caller asked for an alias that doesn't have a vision tier."""
+        if not has_images:
+            return requested
+        s = get_settings()
+        if s.gemini_vision_model:
+            return s.gemini_vision_model
+        # Gemini 2.5 Flash + Pro both handle images, but Pro is more reliable
+        # on layout-heavy / multi-page scans. Promote Flash → Pro for vision.
+        if requested == s.gemini_model_flash:
+            return s.gemini_model_pro
+        return requested
+
     async def call(
         self,
         *,
@@ -34,29 +97,44 @@ class GeminiProvider(BaseProvider):
         max_output_tokens: int | None,
         temperature: float,
     ) -> ProviderCallResult:
-        s = get_settings()
-        if not s.google_api_key:
-            raise ProviderNotConfigured(
-                "GOOGLE_API_KEY is empty. Either set it or inject a FakeGateway in tests."
-            )
-        import google.generativeai as genai  # type: ignore[import-not-found]
-        genai.configure(api_key=s.google_api_key)
+        client = self._build_client()
+        effective_model = self._select_model(model, has_images=bool(images))
 
-        client = genai.GenerativeModel(
-            model_name=model,
-            system_instruction=system,
-            generation_config={
-                "temperature": temperature,
-                "max_output_tokens": max_output_tokens or 4096,
-                "response_mime_type": "application/json" if json_mode else "text/plain",
-            },
-        )
+        from google.genai import types  # type: ignore[import-not-found]
 
+        # Build the parts list: prompt text first, then any inline images.
         parts: list[Any] = [prompt]
         for blob in images:
-            parts.append({"mime_type": "image/png", "data": blob})
+            parts.append(types.Part.from_bytes(data=blob, mime_type="image/png"))
 
-        resp = await asyncio.to_thread(client.generate_content, parts)
+        config_kwargs: dict[str, Any] = {
+            "temperature": temperature,
+            "max_output_tokens": max_output_tokens or 4096,
+            "response_mime_type": "application/json" if json_mode else "text/plain",
+        }
+        if system:
+            config_kwargs["system_instruction"] = system
+
+        try:
+            # The SDK exposes an async surface via ``client.aio``; we use it
+            # so we don't block the event loop. asyncio.to_thread is the
+            # fallback if the installed SDK version is sync-only.
+            if hasattr(client, "aio"):
+                resp = await client.aio.models.generate_content(
+                    model=effective_model,
+                    contents=parts,
+                    config=types.GenerateContentConfig(**config_kwargs),
+                )
+            else:
+                resp = await asyncio.to_thread(
+                    client.models.generate_content,
+                    model=effective_model,
+                    contents=parts,
+                    config=types.GenerateContentConfig(**config_kwargs),
+                )
+        except Exception as exc:
+            raise ProviderError(f"gemini call failed: {exc}") from exc
+
         text = getattr(resp, "text", "") or ""
         usage = getattr(resp, "usage_metadata", None)
         in_tok = getattr(usage, "prompt_token_count", 0) if usage else 0
@@ -64,7 +142,9 @@ class GeminiProvider(BaseProvider):
         return ProviderCallResult(text=text, raw=resp, input_tokens=in_tok, output_tokens=out_tok)
 
     def retryable_exceptions(self) -> tuple[type[BaseException], ...]:
-        return (TimeoutError, ConnectionError, OSError)
+        # ProviderError covers transient SDK errors we wrapped above; the
+        # other classes catch network-layer failures the SDK surfaces raw.
+        return (TimeoutError, ConnectionError, OSError, ProviderError)
 
 
 register_provider("gemini", GeminiProvider)
