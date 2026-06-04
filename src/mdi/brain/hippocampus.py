@@ -185,6 +185,76 @@ class Hippocampus:
             }
         )
 
+    async def lookup_patterns_multi(
+        self,
+        db: AsyncSession,
+        tenant_id: uuid.UUID,
+        cluster: Cluster,
+        *,
+        top_k: int = 5,
+        min_similarity: float = 0.50,
+    ) -> list[MemoryHit]:
+        """Return the top-K patterns whose cluster-text embedding is
+        close to `cluster`'s, sorted by similarity DESC.
+
+        Wave 2.1 of the DD uplift — multi-pattern recognition. A single
+        document can legitimately resemble several stored patterns at
+        once (an invoice with a contract amendment attached, a
+        consolidated bill spanning two vendors). `lookup_pattern` keeps
+        the simple "give me the winner" contract for code paths that
+        only need the top hit; this is the surface for code paths that
+        want the full ranked set.
+
+        `min_similarity` defaults LOWER than SIMILARITY_THRESHOLD (0.50
+        vs 0.82) because the caller usually wants to SEE the field of
+        candidates including the weak ones — the orchestrator filters
+        upward at the use site. Returning weak matches here is the
+        right default for a "show me everything that looks even a
+        little like this" query.
+        """
+        emb = self.embed(cluster)
+        emb_literal = "[" + ",".join(format(x, ".7f") for x in emb) + "]"
+        from sqlalchemy import text
+
+        rows = (
+            await db.execute(
+                text(
+                    """
+                    SELECT id, schema_def, rules,
+                           1 - (embedding <=> CAST(:vec AS vector)) AS sim
+                    FROM patterns
+                    WHERE industry = :industry
+                      AND doc_type = :doc_type
+                      AND embedding IS NOT NULL
+                    ORDER BY embedding <=> CAST(:vec AS vector)
+                    LIMIT :limit
+                    """
+                ),
+                {
+                    "vec": emb_literal,
+                    "industry": cluster.industry,
+                    "doc_type": cluster.doc_type,
+                    "limit": int(top_k),
+                },
+            )
+        ).all()
+
+        hits: list[MemoryHit] = []
+        for row in rows:
+            if row.sim < min_similarity:
+                continue
+            schema = Schema.model_validate(
+                row.schema_def or {"fields": [], "discovered_from": "memory"}
+            )
+            rules = RuleSet.model_validate(row.rules or {"rules": []})
+            hits.append(MemoryHit.model_validate({
+                "pattern_id": row.id,
+                "similarity": float(row.sim),
+                "schema": schema,
+                "rules": rules,
+            }))
+        return hits
+
     async def get_corrections(
         self,
         db: AsyncSession,

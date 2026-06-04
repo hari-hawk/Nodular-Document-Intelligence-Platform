@@ -247,6 +247,14 @@ class BatchReport(StrictModel):
     # as a dict (we keep it untyped here to avoid a circular import; the
     # eval module owns the canonical schema).
     stage_evals: list[dict[str, Any]] = Field(default_factory=list)
+    # Wave 2.1 — multi-pattern recognition. For each processed document,
+    # the FULL ranked list of pattern matches above the lookup_patterns_multi
+    # threshold. Each entry: {document_id, pattern_id, similarity, rank}.
+    # The single top-hit used by the pipeline lives in
+    # Extraction.pattern_id; this surface lets downstream consumers (the
+    # Patterns page, audit log, follow-up extractions) see ALL the
+    # candidates the brain considered — not just the winner.
+    pattern_matches: list[dict[str, Any]] = Field(default_factory=list)
 
     @field_validator("finished_at")
     @classmethod

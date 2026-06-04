@@ -116,6 +116,10 @@ async def run_batch_async(
     anomalies: list[Anomaly] = []
     # Per-stage EvalLayer results - populated as each stage completes.
     stage_evals: list[dict[str, Any]] = []
+    # Wave 2.1 — multi-pattern recognition. The full ranked list of
+    # pattern candidates per document. Item shape:
+    # {document_id, pattern_id, similarity, rank}.
+    pattern_matches: list[dict[str, Any]] = []
 
     # Lazy import to avoid circular dependency.
     from mdi.eval.stage_eval import make_eval as _make_eval
@@ -179,7 +183,22 @@ async def run_batch_async(
 
             if persist:
                 async with tenant_session(tid) as db:
-                    # Stage 3 — memory check
+                    # Stage 3 — memory check. Multi-pattern retrieval lands
+                    # the full ranked candidate set so the Patterns page can
+                    # show "this document also resembled these patterns".
+                    # The pipeline still acts on the top hit (if it clears
+                    # the 0.82 SIMILARITY_THRESHOLD) — but downstream consumers
+                    # see the candidates the brain considered.
+                    multi_matches = await hippo.lookup_patterns_multi(
+                        db, tid, cluster, top_k=5, min_similarity=0.50,
+                    )
+                    for rank, mh in enumerate(multi_matches):
+                        pattern_matches.append({
+                            "document_id": str(doc.document_id),
+                            "pattern_id": str(mh.pattern_id),
+                            "similarity": mh.similarity,
+                            "rank": rank,
+                        })
                     memory_hit = await hippo.lookup_pattern(db, tid, cluster)
                     if memory_hit:
                         await bus.publish(3, "memory.hit",
@@ -457,6 +476,7 @@ async def run_batch_async(
         total_cost_usd=total_cost,
         progress=[f"[{e.stage:02d}] {e.name}: {e.detail}" for e in bus.history],
         stage_evals=stage_evals,
+        pattern_matches=pattern_matches,
     )
 
     if persist:
