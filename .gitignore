@@ -50,3 +50,4 @@ Thumbs.db
 
 # Sample doc fixtures larger than 1MB (PDFs etc) — keep small ones tracked
 tests/fixtures/sample_docs/*.large.pdf
+eval_report.json
