@@ -277,6 +277,42 @@ async def run_batch_async(
                                 invented=a.invented,
                             )
                         )
+                    # Auto-pack proposal (Wave 1.2 of the DD uplift).
+                    # When the pipeline ran in open-vocab / base-pack mode AND
+                    # the extraction surfaced a real vendor, queue an auto-pack
+                    # proposal so analysts can one-click-promote the vendor
+                    # into its own pack. Has zero influence on the current
+                    # extraction — proposals start in `pending` and don't
+                    # affect routing until promoted.
+                    try:
+                        from mdi.kernel.auto_pack_registry import propose_pack
+                        vendor_field = ex.fields.get("vendor")
+                        used_base_pack = (
+                            schema.pack_slug in (None, "business_documents_base")
+                        )
+                        if vendor_field and used_base_pack:
+                            v_value = vendor_field.value
+                            v_name = (
+                                v_value.get("name") if isinstance(v_value, dict)
+                                else v_value
+                            )
+                            if isinstance(v_name, str) and v_name.strip():
+                                await propose_pack(
+                                    db,
+                                    tenant_id=tid,
+                                    vendor_name=v_name,
+                                    doc_type_hint=cluster.doc_type,
+                                    first_seen_doc_id=doc.document_id,
+                                    sample_extraction={
+                                        k: (v.value if hasattr(v, "value") else v)
+                                        for k, v in list(ex.fields.items())[:8]
+                                    },
+                                )
+                    except Exception as _e:
+                        # Never let an auto-pack DB hiccup break extraction;
+                        # this is a side-channel feature.
+                        logger.warning("auto_pack.hook_failed", error=str(_e))
+
                     # Stage 9 — memory write
                     pid = await hippo.write_pattern(
                         db, tid, cluster, schema, ruleset, pattern_id=pattern_id

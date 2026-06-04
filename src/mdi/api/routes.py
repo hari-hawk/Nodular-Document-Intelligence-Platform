@@ -627,4 +627,100 @@ async def admin_issue_api_key(
 
 
 
+# ---------------------------------------------------------------------------
+# Auto-pack proposals queue (Wave 1.2 of the DD uplift)
+# ---------------------------------------------------------------------------
+@router.get("/admin/auto-packs", dependencies=[Depends(require_admin)])
+async def admin_list_auto_packs(
+    status_filter: str = "pending",
+    tenant: Tenant = Depends(current_tenant),
+    db: AsyncSession = Depends(db_session),
+) -> dict[str, Any]:
+    """List auto-discovered pack proposals.
+
+    `status_filter` defaults to `pending`; accepted values are
+    pending / approved / rejected / superseded / all.
+    """
+    from mdi.kernel.auto_pack_registry import list_proposals
+    _ = tenant  # RLS scopes the query — tenant FK is enforced by app.tenant_id GUC
+    return {"proposals": await list_proposals(db, status_filter=status_filter)}
+
+
+class AutoPackDecision(BaseModel):
+    decided_by: str = Field(default="analyst", min_length=1, max_length=255)
+
+
+@router.post(
+    "/admin/auto-packs/{proposal_id}/promote",
+    dependencies=[Depends(require_admin)],
+)
+async def admin_promote_auto_pack(
+    proposal_id: uuid.UUID,
+    payload: AutoPackDecision,
+    tenant: Tenant = Depends(current_tenant),
+    db: AsyncSession = Depends(db_session),
+) -> dict[str, Any]:
+    """One-click promote: writes packs/_auto/<slug>/skills.yaml and
+    flips the proposal to approved. Idempotent — re-promoting an already-
+    approved proposal returns 409 rather than re-writing the file."""
+    from pathlib import Path
+
+    from mdi.kernel.auto_pack_registry import promote_proposal
+    from mdi.models.db import AuditEvent as _Audit
+
+    packs_root = Path(__file__).resolve().parents[1] / "packs"
+    result = await promote_proposal(
+        db,
+        proposal_id=proposal_id,
+        decided_by=payload.decided_by,
+        packs_root=packs_root,
+    )
+    if not result.get("promoted"):
+        reason = result.get("reason", "unknown")
+        if reason == "not_found":
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "proposal not found")
+        raise HTTPException(status.HTTP_409_CONFLICT, f"cannot promote: {reason}")
+
+    db.add(_Audit(
+        tenant_id=tenant.id, actor=payload.decided_by,
+        action="auto_pack.promoted", object_type="auto_pack_proposal",
+        object_id=str(proposal_id),
+        payload=result,
+    ))
+    await db.commit()
+    return result
+
+
+@router.post(
+    "/admin/auto-packs/{proposal_id}/reject",
+    dependencies=[Depends(require_admin)],
+)
+async def admin_reject_auto_pack(
+    proposal_id: uuid.UUID,
+    payload: AutoPackDecision,
+    tenant: Tenant = Depends(current_tenant),
+    db: AsyncSession = Depends(db_session),
+) -> dict[str, Any]:
+    """Mark a proposal rejected — same shape as merge rejection."""
+    from mdi.kernel.auto_pack_registry import reject_proposal
+    from mdi.models.db import AuditEvent as _Audit
+
+    result = await reject_proposal(
+        db, proposal_id=proposal_id, decided_by=payload.decided_by,
+    )
+    if not result.get("rejected"):
+        raise HTTPException(
+            status.HTTP_404_NOT_FOUND,
+            f"proposal not found or not pending: {result.get('reason')}",
+        )
+    db.add(_Audit(
+        tenant_id=tenant.id, actor=payload.decided_by,
+        action="auto_pack.rejected", object_type="auto_pack_proposal",
+        object_id=str(proposal_id),
+        payload={},
+    ))
+    await db.commit()
+    return result
+
+
 _ = authenticate
