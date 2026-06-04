@@ -1,0 +1,15 @@
+units_of_measure:
+  weight: [kg, g, lb, oz, ton]
+  length: [m, cm, mm, ft, in, yd]
+  volume: [L, mL, gal, qt]
+  count: [ea, dozen, gross, box, case]
+
+uom_conversions:
+  # base unit → factor (e.g. 1 kg = 1000 g)
+  kg: {g: 1000, lb: 2.20462, oz: 35.274}
+  m:  {cm: 100, mm: 1000, ft: 3.28084, in: 39.3701}
+  L:  {mL: 1000, gal: 0.264172}
+  dozen: {ea: 12}
+  gross: {ea: 144, dozen: 12}
+
+currencies: [USD, EUR, GBP, JPY, CAD, AUD, CNY, INR]

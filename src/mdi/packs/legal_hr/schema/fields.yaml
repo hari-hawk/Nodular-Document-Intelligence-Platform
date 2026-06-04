@@ -1,0 +1,74 @@
+fields:
+  - name: parties
+    type: list
+    required: true
+    description: |
+      [{name, role, jurisdiction}] — role one of:
+      buyer, seller, service_provider, customer, employer, employee,
+      disclosing_party, receiving_party, licensor, licensee
+  - name: agreement_number
+    type: string
+    required: false
+    description: Contract reference if printed (e.g. MSA-12345)
+  - name: agreement_type
+    type: string
+    required: false
+    description: free text — "Master Services Agreement", "Mutual NDA", etc.
+  - name: effective_date
+    type: date
+    required: false
+  - name: expiration_date
+    type: date
+    required: false
+  - name: term_months
+    type: number
+    required: false
+    description: Initial term in months (validator cross-checks against the date delta)
+  - name: auto_renew
+    type: boolean
+    required: false
+    description: Does the contract auto-renew?
+  - name: auto_renew_notice_days
+    type: number
+    required: false
+    description: Days of notice required to opt out of auto-renew
+  - name: total_contract_value
+    type: currency
+    required: false
+  - name: annual_spend_cap
+    type: currency
+    required: false
+  - name: currency
+    type: string
+    required: false
+  - name: payment_terms
+    type: string
+    required: false
+    description: "Net 30 / Net 60 / etc."
+  - name: governing_law
+    type: string
+    required: false
+  - name: confidentiality_term_years
+    type: number
+    required: false
+  - name: clauses_detected
+    type: list
+    required: false
+    description: |
+      [{type, present}] — type one of:
+      termination, payment, ip_assignment, non_compete, non_solicit,
+      confidentiality, indemnification, limitation_of_liability,
+      auto_renew, governing_law, dispute_resolution
+  # Employment-specific
+  - name: position_title
+    type: string
+    required: false
+  - name: base_salary
+    type: currency
+    required: false
+  - name: start_date
+    type: date
+    required: false
+
+primary_keys:
+  - agreement_number

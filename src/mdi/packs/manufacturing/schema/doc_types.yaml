@@ -1,0 +1,9 @@
+doc_types:
+  purchase_order:
+    aliases: [po, purchase_request]
+  bol:
+    aliases: [bill_of_lading, shipping_doc, packing_slip, delivery_note]
+  supplier_invoice:
+    aliases: [vendor_invoice, invoice, ap_invoice]
+  quality_report:
+    aliases: [qc_report, inspection_report, coa, certificate_of_analysis]

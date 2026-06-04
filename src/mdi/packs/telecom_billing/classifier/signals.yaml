@@ -1,0 +1,13 @@
+signals:
+  invoice:
+    keywords: ["invoice", "billing period", "amount due", "mrc", "monthly recurring charge"]
+    weight: 1.0
+  customer_service_record:
+    keywords: ["customer service record", "csr", "service inventory", "provisioned services"]
+    weight: 1.0
+  contract:
+    keywords: ["master service agreement", "msa", "statement of work", "sow", "effective date"]
+    weight: 0.9
+  usage_report:
+    keywords: ["usage report", "call detail", "cdr", "traffic report", "minutes used", "gb consumed"]
+    weight: 0.9

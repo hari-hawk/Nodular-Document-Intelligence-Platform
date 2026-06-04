@@ -1,0 +1,11 @@
+doc_types:
+  invoice:
+    aliases: [bill, charge, statement_invoice]
+  purchase_order:
+    aliases: [po, p.o., purchase_request]
+  contract:
+    aliases: [agreement, msa, sow, terms]
+  statement:
+    aliases: [account_statement, billing_summary]
+  receipt:
+    aliases: [payment_receipt, paid_receipt]

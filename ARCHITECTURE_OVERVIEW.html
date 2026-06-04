@@ -1,0 +1,1153 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>MDI · Architecture Overview</title>
+  <style>
+* { box-sizing: border-box; }
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    line-height: 1.6; color: #1F2937; background: #FAFAFA;
+    margin: 0; padding: 0;
+}
+.container { max-width: 1100px; margin: 0 auto; padding: 48px 32px 96px; }
+header {
+    background: linear-gradient(135deg, #6366F1 0%, #EC4899 100%);
+    color: white; padding: 56px 32px;
+}
+header .inner { max-width: 1100px; margin: 0 auto; }
+header h1 {
+    font-size: 2.3rem; font-weight: 700; margin: 0 0 12px;
+    letter-spacing: -0.02em;
+}
+header .sub { font-size: 1.05rem; opacity: 0.92; max-width: 720px; }
+h1, h2, h3, h4 { color: #111827; line-height: 1.25; }
+h1 { font-size: 2rem; margin-top: 56px; padding-bottom: 12px;
+     border-bottom: 1px solid #E5E7EB; }
+h2 { font-size: 1.5rem; margin-top: 44px; padding-bottom: 8px;
+     border-bottom: 1px solid #F3F4F6; }
+h3 { font-size: 1.18rem; margin-top: 32px; color: #374151; }
+h4 { font-size: 1rem; margin-top: 24px; color: #4B5563; }
+p { margin: 14px 0; }
+hr { border: none; border-top: 1px solid #E5E7EB; margin: 40px 0; }
+strong { color: #111827; }
+em { color: #4B5563; }
+blockquote {
+    border-left: 4px solid #6366F1; background: #EEF2FF;
+    margin: 18px 0; padding: 14px 20px; color: #312E81; border-radius: 0 6px 6px 0;
+}
+code {
+    font-family: 'SF Mono', Monaco, Menlo, Consolas, monospace;
+    font-size: 0.88em; background: #F3F4F6; color: #BE123C;
+    padding: 2px 6px; border-radius: 4px;
+}
+pre {
+    background: #1F2937; color: #E5E7EB; padding: 16px 20px;
+    border-radius: 8px; overflow-x: auto; font-size: 0.85em;
+    line-height: 1.5;
+}
+pre code { background: transparent; color: inherit; padding: 0; }
+table {
+    border-collapse: collapse; width: 100%; margin: 18px 0;
+    font-size: 0.92em; background: white;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.06); border-radius: 6px;
+    overflow: hidden;
+}
+th, td { padding: 10px 14px; text-align: left; vertical-align: top;
+         border-bottom: 1px solid #F3F4F6; }
+th { background: #1F2937; color: white; font-weight: 600;
+     font-size: 0.86em; letter-spacing: 0.02em; text-transform: uppercase; }
+tr:last-child td { border-bottom: none; }
+tr:hover td { background: #FAFAFA; }
+a { color: #6366F1; text-decoration: none; }
+a:hover { text-decoration: underline; }
+ul, ol { padding-left: 24px; }
+li { margin: 4px 0; }
+.mermaid {
+    background: white; border: 1px solid #E5E7EB; border-radius: 8px;
+    padding: 24px; margin: 24px 0; text-align: center;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+}
+footer {
+    text-align: center; padding: 32px; color: #9CA3AF;
+    font-size: 0.85em; border-top: 1px solid #E5E7EB; margin-top: 48px;
+}
+.toc-wrap {
+    background: white; border: 1px solid #E5E7EB; border-radius: 8px;
+    padding: 16px 24px; margin: 24px 0;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+}
+.toc-wrap > p { font-weight: 600; color: #111827; margin: 0 0 8px; }
+</style>
+</head>
+<body>
+  <header><div class="inner">
+    <h1>MDI · Modular Data Intelligence</h1>
+    <div class="sub">Architecture overview for tech review · 2026-06-03</div>
+  </div></header>
+  <div class="container">
+    <h1 id="mdi-architecture-overview">MDI · Architecture Overview</h1>
+<p><strong>Audience: Tech architect reviewing for adoption / extension / handoff.</strong>
+<strong>Last updated: 2026-06-03.</strong></p>
+<p>This document is the one-stop architectural reference. It links to deeper material where useful but is meant to stand on its own for a 20-minute read.</p>
+<blockquote>
+<p><strong>Deeper docs in this repo:</strong> <code>README.md</code> (runbook) · <code>CLAUDE.md</code> (locked decisions) · <code>MODULE_GUIDE.md</code> (consumer integration) · <code>PIPELINE_AND_FRAMEWORK.md</code> (developer-facing pipeline) · <code>GAP_ANALYSIS.md</code> (what's missing) · <code>mdi/src/mdi/packs/business_documents_base/</code> (canonical pack example).</p>
+</blockquote>
+<hr>
+<h2 id="1-tldr">1. TL;DR</h2>
+<p>MDI is an <strong>autonomous, multi-tenant document-intelligence brain</strong> built on Postgres + pgvector. A document goes in; a typed, validated, knowledge-graph-enriched <code>BatchReport</code> comes out. The same engine handles invoices, claims, contracts, statements, and receipts across telecom / healthcare / cloud finance / legal / manufacturing <strong>without per-domain configuration</strong> in its default open-vocabulary mode. Customer corrections persist to a per-tenant pattern memory and replay automatically on the next similar document — that is the "self-training" property, and it is mechanically a corrections-replay loop, not gradient-descent training.</p>
+<p>The platform is reusable as a <strong>Python library</strong>, a <strong>REST API</strong>, or via <strong>vertical packs</strong> (YAML + Markdown, no Python). Six vertical pack templates ship today (<code>business_documents_base</code>, <code>telecom_billing</code>, <code>cloud_finance</code>, <code>healthcare_claims</code>, <code>manufacturing</code>, <code>legal_hr</code>); a new vertical takes 1–2 weeks per the synthesis doc's Appendix A.7 spec, with the framework already in place to validate and assign them.</p>
+<p>Production posture today: <strong>kernel + 7 organs + 7 supporting layers + RLS + provider fallback chain + audit + RAG + EvalLayers all live</strong>; <strong>44/44 offline tests + live LLM regression suite green</strong>; <strong>stub embedder is the only remaining "demo-vs-prod" gap</strong> (real bge-m3 toggle ships behind one env flag). Honest delta from a production launch: customer-facing onboarding flow polish, golden-dataset accuracy gates per pack, and a security review for regulated industries.</p>
+<hr>
+<h2 id="2-system-overview">2. System overview</h2>
+<pre class="mermaid">flowchart TB
+    classDef ext fill:#1F2A44,stroke:#6366F1,color:#E5E7EB
+    classDef brain fill:#312E81,stroke:#818CF8,color:#FFFFFF
+    classDef store fill:#374151,stroke:#9CA3AF,color:#E5E7EB
+    classDef ui fill:#1F2937,stroke:#4ADE80,color:#E5E7EB
+
+    user[Analyst / Customer]:::ext
+    api[FastAPI · 8080]:::ui
+    ui[Streamlit UI · 8501]:::ui
+    cli[Python library import]:::ui
+
+    user --> ui
+    user --> api
+    user --> cli
+
+    subgraph CHASSIS[Kernel]
+        gw[LLM Gateway]
+        router[Provider Router]
+        ing[Ingest]
+        auth[Auth · JWT · RLS]
+        obs[Observability]
+        packl[Pack Loader]
+    end
+
+    subgraph BRAIN[Brain - 7 organs + 7 layers]
+        eyes[Eyes · classify]:::brain
+        pc[Pattern Cortex · discover]:::brain
+        hands[Hands · extract]:::brain
+        cons[Conscience · validate]:::brain
+        hippo[Hippocampus · memory]:::brain
+        iv[Inner Voice · reflect]:::brain
+        ic[Insight Cortex · analyse]:::brain
+    end
+
+    subgraph PROVIDERS[LLM Providers]
+        gem[Gemini Flash / Pro]:::ext
+        cla[Claude Haiku / Sonnet / Opus]:::ext
+    end
+
+    subgraph DATA[Tier 6 - Data]
+        pg[(Postgres 15 + pgvector)]:::store
+        redis[(Redis)]:::store
+        kg[Knowledge Graph]:::store
+        rag[RAG · doc_chunks]:::store
+    end
+
+    ui --> api
+    api --> CHASSIS
+    cli --> CHASSIS
+    CHASSIS --> BRAIN
+    BRAIN --> gw
+    gw --> router
+    router --> gem
+    router --> cla
+    BRAIN --> pg
+    BRAIN --> kg
+    BRAIN --> rag
+    CHASSIS --> redis</pre>
+<p>Three things to notice:</p>
+<ol>
+<li><strong>Kernel is the only thing the Brain talks to for I/O.</strong> Organs never call Postgres or LLM APIs directly — they go through <code>tenant_session()</code> and <code>llm_gateway.generate()</code>. That's what makes them swappable.</li>
+<li><strong>Provider router sits between the gateway and the LLMs.</strong> The brain says "I need synthesis-tier inference"; the router picks Gemini primary or Claude fallback per the locked policy.</li>
+<li><strong>Three UI surfaces — same kernel.</strong> Streamlit (analyst), FastAPI (programmatic), and direct library import (in-process) all hit the same orchestrator. No business logic in any UI.</li>
+</ol>
+<hr>
+<h2 id="3-the-19-stage-processing-pipeline">3. The 19-stage processing pipeline</h2>
+<pre class="mermaid">flowchart LR
+    classDef phase1 fill:#1F2A44,stroke:#60A5FA,color:#E5E7EB
+    classDef phase2 fill:#1F2A44,stroke:#FBBF24,color:#E5E7EB
+    classDef phase3 fill:#1F2A44,stroke:#34D399,color:#E5E7EB
+    classDef phase4 fill:#1F2A44,stroke:#F472B6,color:#E5E7EB
+
+    s0[0 · page gate]:::phase1
+    s1[1 · ingest]:::phase1
+    s2[2 · classify Eyes]:::phase1
+    s3{3 · memory hit?}:::phase1
+    s4[4 · schema discovery]:::phase1
+    s5[5 · rule invent gated]:::phase1
+    s6[6 · correction lookup]:::phase1
+    s7[7 · extract Hands]:::phase1
+    s8[8 · validate Conscience]:::phase1
+    s9[9 · memory + RAG write]:::phase1
+
+    s10[10 · insights]:::phase2
+    s11[11 · reflection]:::phase2
+    s12[12 · group discovery]:::phase2
+    s13[13 · coverage]:::phase2
+
+    s14[14 · account briefings]:::phase3
+    s15[15 · narrator]:::phase3
+    s16[16 · BatchReport]:::phase3
+
+    s17[17 · graph build + entity res]:::phase4
+    s18[18 · graph insights]:::phase4
+    s19[19 · cross-doc validation]:::phase4
+
+    s0 --> s1 --> s2 --> s3
+    s3 -->|miss| s4 --> s5 --> s6
+    s3 -->|HIT| s6
+    s6 --> s7 --> s8 --> s9 --> s10
+    s10 --> s11 --> s12 --> s13 --> s14 --> s15 --> s16 --> s17 --> s18 --> s19</pre>
+<table>
+<thead>
+<tr>
+<th>Phase</th>
+<th>Stages</th>
+<th>What it produces</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1 — per-doc</td>
+<td>0–9</td>
+<td>Classified, extracted, validated <code>Extraction</code> per document; pattern + RAG chunks persisted</td>
+</tr>
+<tr>
+<td>2 — batch</td>
+<td>10–13</td>
+<td>Cross-document <code>Insights</code>, <code>Reflection</code>, <code>DocumentGroups</code>, coverage classification</td>
+</tr>
+<tr>
+<td>3 — report</td>
+<td>14–16</td>
+<td><code>AccountBriefing</code> per group, narrator summary, assembled <code>BatchReport</code></td>
+</tr>
+<tr>
+<td>4 — graph</td>
+<td>17–19</td>
+<td>KG node/edge upserts with entity resolution, graph centrality insights, cross-doc validation</td>
+</tr>
+</tbody>
+</table>
+<p><strong>LLM hits per stage</strong> — only 6 out of 19 stages call an LLM: <code>2 classify</code>, <code>4 schema discovery</code>, <code>5 rule invention</code> (gated off in production), <code>7 extract</code>, <code>15 narrator</code>, and optionally <code>10 insight narration</code>. Every other stage is deterministic Python.</p>
+<p><strong>Cost profile from live measurement</strong>: cold-start batch ≈ $0.015/doc (Gemini); memory-hit batch ≈ $0.005/doc (67% reduction because Pattern Cortex is skipped on hits).</p>
+<hr>
+<h2 id="4-tech-stack">4. Tech stack</h2>
+<table>
+<thead>
+<tr>
+<th>Layer</th>
+<th>Technology</th>
+<th>Why this choice</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>LLM — perception / extraction</td>
+<td>Gemini 2.5 Flash + Vision</td>
+<td>Cheap, multimodal, fast</td>
+</tr>
+<tr>
+<td>LLM — reasoning / synthesis</td>
+<td>Gemini 2.5 Pro · Claude Opus 4.1 (fallback)</td>
+<td>Long context, calibrated reasoning, vendor resilience</td>
+</tr>
+<tr>
+<td>LLM gateway</td>
+<td>Custom, async, tier-routed, with tenacity retry</td>
+<td>Provider-agnostic brain, single chokepoint for cost + observability</td>
+</tr>
+<tr>
+<td>Embeddings</td>
+<td><code>sentence-transformers BAAI/bge-m3</code> (real) or SHA-stub (dev)</td>
+<td>1024-dim, multilingual; stub for offline tests</td>
+</tr>
+<tr>
+<td>Structured memory</td>
+<td>Postgres 15 + JSONB</td>
+<td>Standard, queryable, audit-friendly</td>
+</tr>
+<tr>
+<td>Vector memory</td>
+<td>pgvector HNSW (cosine)</td>
+<td>Same DB as structured data — one ops surface</td>
+</tr>
+<tr>
+<td>Document parsing</td>
+<td>pypdf, python-docx, openpyxl, pandas, Pillow</td>
+<td>Battle-tested, 11 file formats</td>
+</tr>
+<tr>
+<td>Pack format</td>
+<td>YAML + Markdown</td>
+<td>Domain experts can author without Python</td>
+</tr>
+<tr>
+<td>Knowledge graph</td>
+<td>Postgres-backed adjacency (<code>kg_nodes</code>, <code>kg_edges</code>)</td>
+<td>RLS-isolated; NetworkX-shaped read API</td>
+</tr>
+<tr>
+<td>API backend</td>
+<td>FastAPI + Pydantic v2</td>
+<td>Async-first, typed, OpenAPI-native</td>
+</tr>
+<tr>
+<td>Job queue</td>
+<td>Celery + Redis</td>
+<td>Battle-tested; supports long-running batches</td>
+</tr>
+<tr>
+<td>Analyst UI</td>
+<td>Streamlit</td>
+<td>Fastest path from Python to UX</td>
+</tr>
+<tr>
+<td>Customer-facing UI</td>
+<td>React + Tailwind (deferred v1.1+)</td>
+<td>Polished onboarding when needed</td>
+</tr>
+<tr>
+<td>Safety / sandbox</td>
+<td><code>simpleeval</code> + tenacity + CostTracker</td>
+<td>AST-walker, not Python eval; tested escape rejection</td>
+</tr>
+<tr>
+<td>Auth</td>
+<td>JWT + per-tenant API keys + Postgres RLS</td>
+<td>Database-layer isolation, not just app-layer</td>
+</tr>
+<tr>
+<td>Tests</td>
+<td>pytest + custom <code>FakeGateway</code> + <code>--run-live</code> gate</td>
+<td>44/44 offline, opt-in live suite</td>
+</tr>
+<tr>
+<td>Observability</td>
+<td>structlog + Langfuse (opt-in)</td>
+<td>JSON logs by default; LLM tracing when keys set</td>
+</tr>
+</tbody>
+</table>
+<hr>
+<h2 id="5-multi-tenancy-security-model">5. Multi-tenancy + security model</h2>
+<pre class="mermaid">flowchart LR
+    classDef tenant fill:#1F2A44,stroke:#6366F1,color:#E5E7EB
+    classDef role fill:#312E81,stroke:#A78BFA,color:#FFFFFF
+    classDef table fill:#374151,stroke:#9CA3AF,color:#E5E7EB
+
+    req[API request]:::tenant
+    auth[auth.tenant_session]:::role
+    guc[SET app.tenant_id = ...]:::role
+    rls[RLS policy filters every row]:::role
+    docs[documents]:::table
+    ext[extractions]:::table
+    pat[patterns]:::table
+    kg[kg_nodes / kg_edges]:::table
+    aud[audit_log]:::table
+    chk[doc_chunks - RAG]:::table
+
+    req --> auth --> guc --> rls
+    rls --> docs
+    rls --> ext
+    rls --> pat
+    rls --> kg
+    rls --> aud
+    rls --> chk</pre>
+<table>
+<thead>
+<tr>
+<th>Concern</th>
+<th>Implementation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Tenant identity</td>
+<td>UUID in <code>tenants</code> table, propagated via JWT (<code>tid</code> claim) or <code>X-API-Key</code> header</td>
+</tr>
+<tr>
+<td>Row-level isolation</td>
+<td>Postgres RLS policies on <strong>all 12 tenant-scoped tables</strong> filter by <code>current_setting('app.tenant_id', true)</code></td>
+</tr>
+<tr>
+<td>Connection role</td>
+<td><code>mdi_app</code> (non-superuser, <code>NOBYPASSRLS</code>). The superuser <code>mdi</code> is for migrations only.</td>
+</tr>
+<tr>
+<td>Cross-tenant leakage prevention</td>
+<td>If GUC is unset, NO rows are visible — fail-closed by default</td>
+</tr>
+<tr>
+<td>Audit</td>
+<td>Every write logs to <code>audit_log</code> (actor, action, payload, timestamp), per-tenant queryable from UI</td>
+</tr>
+<tr>
+<td>Admin endpoints</td>
+<td>Gated by separate <code>X-Admin-Key</code> (constant-time compare); never use tenant JWT</td>
+</tr>
+<tr>
+<td>PHI / sensitive data</td>
+<td>Per-pack <code>compliance.business_rules</code>; healthcare pack ships with PHI guardrails (no name / DOB extraction, audit on read)</td>
+</tr>
+<tr>
+<td>Cost controls</td>
+<td>Daily global cap + per-tenant monthly ceiling; soft warn at 80%, hard cap at 100% with manual override</td>
+</tr>
+<tr>
+<td>Conscience rule invention</td>
+<td>LLM can propose rules but they ship <code>enabled=false</code> until analyst approves (gated by <code>ENABLE_INVENTED_RULES=false</code> env default)</td>
+</tr>
+<tr>
+<td>Entity-resolution merges</td>
+<td>Two-tier: auto (≥85) merges silently with audit row, review-tier (80-84) writes to <code>entity_merge_proposals</code> for analyst decision</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Verified live</strong>: two-tenant concurrent processing isolation tested (<code>tests/integration/test_two_tenant_isolation.py</code>); zero cross-tenant rows visible.</p>
+<hr>
+<h2 id="6-the-self-training-loop">6. The self-training loop</h2>
+<pre class="mermaid">sequenceDiagram
+    participant A as Analyst
+    participant Eyes
+    participant Hippo as Hippocampus
+    participant Hands
+    participant Doc as Postgres
+
+    Note over A, Doc: Run 1 — first time seeing this vendor
+    A->>Eyes: upload invoice
+    Eyes->>Hippo: cluster (industry, vendor, doc_type)
+    Hippo-->>Eyes: memory miss
+    Eyes->>Hands: extract with discovered schema
+    Hands->>Doc: persist Extraction
+    Hands-->>A: account_number = '133442501'
+    A->>Doc: correction → '0133442501' (leading zero)
+    Doc->>Hippo: store correction with scope
+
+    Note over A, Doc: Run 2 — next invoice, same vendor
+    A->>Eyes: upload another invoice
+    Eyes->>Hippo: cluster (industry, vendor, doc_type)
+    Hippo-->>Hands: memory HIT (cosine ≥ 0.82) + correction
+    Hands->>Hands: prompt now includes:<br/>"account_number = '0133442501'<br/>(user-corrected 1x)"
+    Hands-->>A: account_number = '0133442501' ✓ (zero preserved)
+
+    Note over A, Doc: Run N — correction stabilises
+    A->>Eyes: upload another invoice
+    Eyes->>Hippo: cluster
+    Hippo-->>Hands: memory HIT + correction (agreement_count = 5)
+    Hands-->>A: strong-rule extraction</pre>
+<p><strong>Three properties that make this a moat</strong>:</p>
+<ol>
+<li><strong>Per-tenant via RLS</strong> — corrections are hard-isolated at the DB layer. Customer A's corrections never leak into Customer B's prompts.</li>
+<li><strong>Scope-aware</strong> — a correction for AT&amp;T's account-number format doesn't apply to Verizon. The <code>(industry, vendor, doc_type)</code> tuple keeps domains separate. With the <strong>real bge-m3 embedder</strong> (not the stub), <code>"AT&amp;T"</code> and <code>"AT&amp;T Business Services"</code> collapse into one pattern via cosine similarity.</li>
+<li><strong>Compounding</strong> — every correction makes future extractions of similar docs both cheaper (memory hit → Pattern Cortex skipped) and more accurate (corrections replay into the prompt).</li>
+</ol>
+<p><strong>Synthesised curve</strong> from the POC: ~75% Day-1 accuracy → ~95%+ Month-3 on a customer's specific document types. Validated structurally in live tests; held-out accuracy per pack is still a gap (see §11).</p>
+<hr>
+<h2 id="7-deployment-topology">7. Deployment topology</h2>
+<pre class="mermaid">flowchart TB
+    subgraph LOCAL[Local / dev]
+        l1[docker-compose: postgres + redis]
+        l2[uvicorn :8080]
+        l3[streamlit :8501]
+        l4[.env: API keys]
+    end
+
+    subgraph PROD[Production target shape]
+        p1[(Hosted Postgres + pgvector >=0.5)]
+        p2[(Hosted Redis)]
+        p3[FastAPI behind LB - gunicorn workers]
+        p4[Streamlit behind auth proxy / VPN]
+        p5[Celery workers]
+        p6[Secrets in vault]
+        p7[Langfuse for LLM tracing]
+    end
+
+    l1 --> p1
+    l1 --> p2
+    l2 --> p3
+    l3 --> p4
+    l4 --> p6</pre>
+<table>
+<thead>
+<tr>
+<th>Concern</th>
+<th>Local</th>
+<th>Production target</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Secrets</td>
+<td><code>.env</code>, gitignored</td>
+<td>AWS Secrets Manager / Vault / GCP Secret Manager</td>
+</tr>
+<tr>
+<td>Postgres</td>
+<td>docker-compose, port 5532</td>
+<td>RDS / Supabase / Neon / Aiven</td>
+</tr>
+<tr>
+<td>Redis</td>
+<td>docker-compose, port 6479</td>
+<td>ElastiCache / Upstash / Render</td>
+</tr>
+<tr>
+<td>App role</td>
+<td><code>mdi_app</code> (NOSUPERUSER, NOBYPASSRLS)</td>
+<td>Same — RLS depends on this</td>
+</tr>
+<tr>
+<td>API</td>
+<td><code>uvicorn</code> single process</td>
+<td>gunicorn + uvicorn workers behind LB</td>
+</tr>
+<tr>
+<td>UI</td>
+<td>port 8501, local</td>
+<td>Behind VPN or auth proxy, never direct exposure</td>
+</tr>
+<tr>
+<td>Backups</td>
+<td>None</td>
+<td><code>pg_dump</code> nightly + WAL archiving</td>
+</tr>
+<tr>
+<td>Live LLM eval</td>
+<td>manual <code>--run-live</code></td>
+<td>Nightly CI; alert on accuracy drift per pack</td>
+</tr>
+<tr>
+<td>Cost cap</td>
+<td>per-tenant <code>monthly_cost_cap_usd</code></td>
+<td>Alert on <code>BudgetExceeded</code> events</td>
+</tr>
+<tr>
+<td>Provider failover</td>
+<td>Built-in chain (Gemini → Claude)</td>
+<td>Verify keys stocked + rotated quarterly</td>
+</tr>
+<tr>
+<td>Migrations</td>
+<td><code>alembic upgrade head</code></td>
+<td>Run as part of CI/CD via superuser role</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Current maturity</strong>: local-mode complete and tested end-to-end. Cloud setup is a config swap (DATABASE_URL, REDIS_URL) — no code changes required.</p>
+<hr>
+<h2 id="8-three-reusable-integration-shapes">8. Three reusable integration shapes</h2>
+<pre class="mermaid">flowchart LR
+    classDef shape fill:#1F2A44,stroke:#6366F1,color:#E5E7EB
+
+    subgraph A[Shape A · Library import]
+        a1[your Python project]:::shape
+        a2[import mdi.orchestrator.pipeline]:::shape
+        a3[in-process, no network hop]:::shape
+        a1 --> a2 --> a3
+    end
+
+    subgraph B[Shape B · REST API]
+        b1[any-language client]:::shape
+        b2[HTTP POST :8080/process]:::shape
+        b3[multipart upload]:::shape
+        b1 --> b2 --> b3
+    end
+
+    subgraph C[Shape C · Pack contribution]
+        c1[domain expert YAML+MD]:::shape
+        c2[drop into packs/your-vertical/]:::shape
+        c3[assign via Admin tab dropdown]:::shape
+        c1 --> c2 --> c3
+    end</pre>
+<table>
+<thead>
+<tr>
+<th>Shape</th>
+<th>Best for</th>
+<th>Cost to adopt</th>
+<th>Time to first run</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>A · Library</strong></td>
+<td>Python apps that want zero network hop + own runtime</td>
+<td><code>pip install -e ../mdi</code></td>
+<td>Minutes</td>
+</tr>
+<tr>
+<td><strong>B · REST API</strong></td>
+<td>Non-Python stacks (Node, Go, mobile)</td>
+<td>API client + key</td>
+<td>Minutes (after server start)</td>
+</tr>
+<tr>
+<td><strong>C · Pack contribution</strong></td>
+<td>Domain experts adding a new vertical without writing code</td>
+<td>One YAML directory</td>
+<td>1–2 weeks for a production-tagged pack with golden seed</td>
+</tr>
+</tbody>
+</table>
+<p>See <code>MODULE_GUIDE.md</code> for full integration code.</p>
+<hr>
+<h2 id="9-locked-architectural-decisions">9. Locked architectural decisions</h2>
+<p>These are settled. Reopening them requires evidence the original rationale changed.</p>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Decision</th>
+<th>Why locked</th>
+<th>Where enforced</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>Open-vocabulary by default; packs optional</td>
+<td>POC showed 5 industries working with no per-domain config</td>
+<td><code>tenants.pack_slug</code> defaults NULL</td>
+</tr>
+<tr>
+<td>2</td>
+<td>Build on POC, not greenfield</td>
+<td>Working code + 139 tests already exist</td>
+<td>n/a — strategy</td>
+</tr>
+<tr>
+<td>3</td>
+<td>Multi-tenant isolation via Postgres RLS</td>
+<td>Defense in depth at storage layer, not just app</td>
+<td><code>migrations/0001_initial.py</code></td>
+</tr>
+<tr>
+<td>4</td>
+<td>Conscience-invented rules gated by analyst review</td>
+<td>LLM-invented rules can hallucinate; analyst must approve</td>
+<td><code>settings.enable_invented_rules</code></td>
+</tr>
+<tr>
+<td>5</td>
+<td>Job queue = Celery + Redis</td>
+<td>Battle-tested; Temporal considered + rejected for v1</td>
+<td><code>src/mdi/kernel/job_queue.py</code></td>
+</tr>
+<tr>
+<td>6</td>
+<td>Pack registry internal-only for v1</td>
+<td>Partner-built packs add review burden; defer to v1.1</td>
+<td><code>pack_loader.list_packs()</code> reads only <code>src/mdi/packs/</code></td>
+</tr>
+<tr>
+<td>7</td>
+<td>Cost: soft warn 80%, hard cap 100%, manual override</td>
+<td>Cap discipline without blocking legitimate spikes</td>
+<td><code>tenants.cost_override_active</code></td>
+</tr>
+<tr>
+<td>8</td>
+<td>Streamlit for analyst UI; React for customer-facing (deferred)</td>
+<td>Speed of analyst feature delivery vs polish for customers</td>
+<td><code>src/mdi/ui/streamlit_app.py</code></td>
+</tr>
+<tr>
+<td>9</td>
+<td>LLM routing = Gemini primary, Claude fallback chain</td>
+<td>Resilience without doubling cost; ~5× cost only on outage</td>
+<td><code>src/mdi/kernel/provider_router.py::_POLICY</code></td>
+</tr>
+<tr>
+<td>10</td>
+<td>Per-tenant eval thresholds via <code>tenants.config.eval_thresholds</code></td>
+<td>Strict customers vs high-volume customers want different bars</td>
+<td><code>src/mdi/eval/stage_eval.py::make_eval</code></td>
+</tr>
+<tr>
+<td>11</td>
+<td>RAG separate from pattern memory</td>
+<td>Different grain (chunks vs schemas) + different fire conditions</td>
+<td><code>src/mdi/brain/rag.py</code> vs <code>hippocampus.py</code></td>
+</tr>
+<tr>
+<td>12</td>
+<td>EvalLayers deterministic, not LLM-as-judge</td>
+<td>Free, instant, no provider lock-in for quality gating</td>
+<td><code>src/mdi/eval/stage_eval.py</code></td>
+</tr>
+<tr>
+<td>13</td>
+<td>Canonical field naming at orchestrator boundary</td>
+<td>Pattern Cortex schemas keep raw LLM names; downstream sees canonical</td>
+<td><code>src/mdi/brain/_canonical_fields.py</code></td>
+</tr>
+</tbody>
+</table>
+<hr>
+<h2 id="10-extension-recipes">10. Extension recipes</h2>
+<h3 id="101-add-a-new-vertical-12-weeks">10.1 Add a new vertical (1–2 weeks)</h3>
+<ol>
+<li>Copy <code>packs/business_documents_base/</code> to <code>packs/&lt;your-vertical&gt;/</code></li>
+<li>Author <code>skills.yaml</code> per the 13 mandatory slots</li>
+<li>Replace field schema, prompts, validators with vertical-specific content</li>
+<li>Drop ≥10 sample documents into <code>eval/golden/&lt;your-vertical&gt;/</code> with a <code>golden.yaml</code></li>
+<li>Run <code>pytest -m live_llm</code> to validate against your golden set</li>
+<li>Tag version <code>1.0.0</code> when held-out accuracy ≥ 90%</li>
+</ol>
+<h3 id="102-add-a-new-llm-provider">10.2 Add a new LLM provider</h3>
+<ol>
+<li>Subclass <code>BaseProvider</code> in <code>src/mdi/kernel/providers/&lt;name&gt;_provider.py</code></li>
+<li>Implement <code>call(...)</code> returning <code>ProviderCallResult</code></li>
+<li>Register via <code>register_provider("&lt;name&gt;", &lt;name&gt;Provider)</code> at import</li>
+<li>Add to <code>provider_router._POLICY</code> for relevant tiers</li>
+<li>Add <code>&lt;NAME&gt;_API_KEY</code> to <code>.env.example</code> + <code>settings.py</code></li>
+</ol>
+<p>No brain organ changes; the new provider is immediately available to every organ that uses tier-based routing.</p>
+<h3 id="103-add-a-new-organ">10.3 Add a new organ</h3>
+<ol>
+<li>Create <code>src/mdi/brain/&lt;organ&gt;.py</code> with a clear Pydantic I/O contract</li>
+<li>Add stage I/O contracts to <code>src/mdi/models/schemas.py</code></li>
+<li>Wire into <code>src/mdi/orchestrator/pipeline.py</code> at the right stage</li>
+<li>Add an <code>EvalLayer</code> in <code>src/mdi/eval/stage_eval.py</code>; register via <code>STAGE_EVALS["&lt;key&gt;"]</code></li>
+<li>Unit test with <code>FakeGateway</code> in <code>tests/unit/test_&lt;organ&gt;.py</code></li>
+</ol>
+<h3 id="104-add-per-tenant-customization">10.4 Add per-tenant customization</h3>
+<ol>
+<li>Add the new field to <code>tenants.config</code> JSONB. <strong>No migration needed.</strong></li>
+<li>Read it: <code>tenant.config.get("&lt;field&gt;", &lt;default&gt;)</code></li>
+<li>Surface it in the Admin tab's tenant-edit panel</li>
+</ol>
+<p>Per-tenant <code>eval_thresholds</code> already uses this pattern.</p>
+<hr>
+<h2 id="11-open-gaps-and-risks">11. Open gaps and risks</h2>
+<p>These are honest assessments, prioritised by impact-on-adoption. See <code>GAP_ANALYSIS.md</code> for the full backlog.</p>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Gap</th>
+<th>Severity</th>
+<th>Path to closure</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>Held-out per-pack accuracy not yet measured</td>
+<td><strong>High</strong></td>
+<td>Author <code>eval/golden/&lt;pack&gt;/</code> for each new pack (~10 docs each + expected extractions)</td>
+</tr>
+<tr>
+<td>2</td>
+<td>Stub embedder is dev default; real bge-m3 requires <code>USE_REAL_EMBEDDINGS=true</code></td>
+<td><strong>Medium</strong></td>
+<td>Toggle exists; production deployment must set this. ~2GB model download on first use</td>
+</tr>
+<tr>
+<td>3</td>
+<td>Customer-facing onboarding flow uses analyst UI today</td>
+<td><strong>Medium</strong></td>
+<td>Build React+Tailwind onboarding surface (v1.1, deferred)</td>
+</tr>
+<tr>
+<td>4</td>
+<td>Security review for regulated industries (SOC2 / HIPAA) not yet conducted</td>
+<td><strong>High for healthcare</strong></td>
+<td>Required before first healthcare paying customer; healthcare pack ships PHI guardrails as a starting point</td>
+</tr>
+<tr>
+<td>5</td>
+<td>Stripe billing integration not wired</td>
+<td>Medium</td>
+<td>Synthesis Section 21 Phase 5 deliverable</td>
+</tr>
+<tr>
+<td>6</td>
+<td>First native integration (QuickBooks / SAP / etc.) not built</td>
+<td>Medium</td>
+<td>Adapter framework in place; integration is per-customer</td>
+</tr>
+<tr>
+<td>7</td>
+<td>"Approve-undo" for accidentally-merged KG entities</td>
+<td>Low</td>
+<td>Soft delete with 24h restore window; gap-analysis loose end</td>
+</tr>
+</tbody>
+</table>
+<p><strong>No-go for production today</strong>: deploying to a regulated industry (healthcare, finance with PII) without the security review. <strong>OK for production today</strong>: internal-only deployments, non-PHI verticals like cloud finance / manufacturing / telecom-billing.</p>
+<hr>
+<h2 id="12-test-observability-status">12. Test + observability status</h2>
+<table>
+<thead>
+<tr>
+<th>Metric</th>
+<th>Current</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Offline test suite</td>
+<td><strong>44 passed, 5 skipped (opt-in live)</strong> in ~5s</td>
+</tr>
+<tr>
+<td>Live LLM regression suite</td>
+<td>Cross-industry · memory hit · provider fallback · eval+audit · real embeddings — all gated by <code>--run-live</code></td>
+</tr>
+<tr>
+<td>Cross-industry validation</td>
+<td>5 docs across 4 industries; correctly classified, extracted, all confidence 1.00 (live Gemini)</td>
+</tr>
+<tr>
+<td>Memory-hit cost reduction</td>
+<td><strong>67% measured</strong> (live, real Gemini, AT&amp;T invoice across two batches)</td>
+</tr>
+<tr>
+<td>Two-tenant RLS isolation</td>
+<td>Verified end-to-end; concurrent processing, zero cross-tenant rows visible</td>
+</tr>
+<tr>
+<td>Pack count</td>
+<td>6 packs (1 baseline + 5 vertical templates)</td>
+</tr>
+<tr>
+<td>Provider fallback</td>
+<td>Verified — <code>GOOGLE_API_KEY=""</code> → all 4 organs serve from Claude</td>
+</tr>
+<tr>
+<td>Audit log coverage</td>
+<td>Every batch + entity-resolution decision + user correction writes a row</td>
+</tr>
+<tr>
+<td>Per-stage EvalLayers</td>
+<td>6 stages instrumented (classify, schema, extract, validate, insights, graph)</td>
+</tr>
+<tr>
+<td>API endpoint count</td>
+<td>18 (process, report, chat, correction, usage, merges×3, admin×8, embeddings×2, health)</td>
+</tr>
+</tbody>
+</table>
+<hr>
+<h2 id="13-cost-model">13. Cost model</h2>
+<p>Measured on live Gemini, normalised per-doc:</p>
+<table>
+<thead>
+<tr>
+<th>Scenario</th>
+<th>Per-doc cost</th>
+<th>What drives it</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Cold start (no prior memory)</td>
+<td><strong>$0.015</strong></td>
+<td>4 LLM calls: Eyes (Flash) · Pattern Cortex (Pro) · Hands (Flash) · Narrator (Pro amortised)</td>
+</tr>
+<tr>
+<td>Memory hit (similar pattern in Hippocampus)</td>
+<td><strong>$0.005</strong></td>
+<td>3 LLM calls: Eyes · Hands · Narrator (Pattern Cortex skipped)</td>
+</tr>
+<tr>
+<td>Fallback to Claude (Gemini outage)</td>
+<td>~$0.07</td>
+<td>Claude Opus on reasoning + synthesis tiers, ~5× Gemini cost</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Unit economics from the synthesis doc</strong>: 1,000 docs/month/customer ≈ $10–20 raw API cost. Charging $500–5,000/month/customer → gross margin &gt;95% at typical volumes.</p>
+<p><strong>Cost ceilings</strong>: daily global cap (env) + per-tenant monthly cap (DB). Soft warn at 80%, hard <code>BudgetExceeded</code> at 100%, manual override flag for legitimate spikes.</p>
+<hr>
+<h2 id="appendix-a-api-surface">Appendix A · API surface</h2>
+<p>All endpoints under <code>http://localhost:8080</code>. Auth: <code>X-API-Key</code> (per tenant) for everything except admin endpoints, which use <code>X-Admin-Key</code>.</p>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Path</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>GET</code></td>
+<td><code>/health</code></td>
+<td>Liveness probe</td>
+</tr>
+<tr>
+<td><code>POST</code></td>
+<td><code>/process</code></td>
+<td>multipart files → BatchReport JSON</td>
+</tr>
+<tr>
+<td><code>GET</code></td>
+<td><code>/report/{batch_id}</code></td>
+<td>Fetch a previously-run batch</td>
+</tr>
+<tr>
+<td><code>POST</code></td>
+<td><code>/chat</code></td>
+<td>Graph-routed + RAG-grounded synthesis Q&amp;A</td>
+</tr>
+<tr>
+<td><code>POST</code></td>
+<td><code>/correction</code></td>
+<td>Submit an analyst correction (powers self-improvement)</td>
+</tr>
+<tr>
+<td><code>GET</code></td>
+<td><code>/tenant/usage</code></td>
+<td>Spend + cap status for the calling tenant</td>
+</tr>
+<tr>
+<td><code>GET</code></td>
+<td><code>/merges</code></td>
+<td>List entity-merge proposals</td>
+</tr>
+<tr>
+<td><code>POST</code></td>
+<td><code>/merges/{id}/approve</code></td>
+<td>Approve a pending merge (executes the KG mutation)</td>
+</tr>
+<tr>
+<td><code>POST</code></td>
+<td><code>/merges/{id}/reject</code></td>
+<td>Reject a pending merge (persists rejection)</td>
+</tr>
+<tr>
+<td><code>GET</code></td>
+<td><code>/admin/tenants</code></td>
+<td>List tenants (admin only)</td>
+</tr>
+<tr>
+<td><code>POST</code></td>
+<td><code>/admin/tenants</code></td>
+<td>Create tenant + issue first API key</td>
+</tr>
+<tr>
+<td><code>PATCH</code></td>
+<td><code>/admin/tenants/{id}</code></td>
+<td>Update tenant (pack, cap, display name, override)</td>
+</tr>
+<tr>
+<td><code>POST</code></td>
+<td><code>/admin/tenants/{id}/api_keys</code></td>
+<td>Rotate / issue additional key</td>
+</tr>
+<tr>
+<td><code>GET</code></td>
+<td><code>/admin/packs</code></td>
+<td>List available packs</td>
+</tr>
+<tr>
+<td><code>GET</code></td>
+<td><code>/admin/packs/{slug}</code></td>
+<td>Full resolved pack manifest (schema, prompts, validators inlined)</td>
+</tr>
+<tr>
+<td><code>GET</code></td>
+<td><code>/admin/embeddings/status</code></td>
+<td>Current embedder mode + load state</td>
+</tr>
+<tr>
+<td><code>POST</code></td>
+<td><code>/admin/embeddings/warm</code></td>
+<td>Force-load bge-m3 (block until loaded)</td>
+</tr>
+<tr>
+<td><code>GET</code></td>
+<td><code>/architecture</code></td>
+<td>This document, rendered as HTML</td>
+</tr>
+</tbody>
+</table>
+<hr>
+<h2 id="appendix-b-data-model">Appendix B · Data model</h2>
+<pre class="mermaid">erDiagram
+    TENANTS ||--o{ API_KEYS : has
+    TENANTS ||--o{ DOCUMENTS : owns
+    TENANTS ||--o{ PATTERNS : owns
+    TENANTS ||--o{ CORRECTIONS : owns
+    TENANTS ||--o{ KG_NODES : owns
+    TENANTS ||--o{ KG_EDGES : owns
+    TENANTS ||--o{ AUDIT_LOG : owns
+    TENANTS ||--o{ BATCHES : owns
+    TENANTS ||--o{ DOC_CHUNKS : owns
+    TENANTS ||--o{ ENTITY_MERGE_PROPOSALS : owns
+    DOCUMENTS ||--|| EXTRACTIONS : has
+    DOCUMENTS ||--o{ ANOMALIES : has
+    DOCUMENTS ||--o{ DOC_CHUNKS : chunked-into
+    KG_NODES ||--o{ KG_EDGES : src
+    KG_NODES ||--o{ KG_EDGES : dst
+
+    TENANTS {
+        uuid id PK
+        string slug
+        string display_name
+        float monthly_cost_cap_usd
+        string pack_slug
+        jsonb config
+        timestamp created_at
+    }
+    DOCUMENTS {
+        uuid id PK
+        uuid tenant_id FK
+        string filename
+        string mime_type
+        int page_count
+        jsonb cluster
+        timestamp created_at
+    }
+    PATTERNS {
+        uuid id PK
+        uuid tenant_id FK
+        string industry
+        string vendor
+        string doc_type
+        jsonb schema_def
+        vector embedding
+        int seen_count
+    }
+    KG_NODES {
+        uuid id PK
+        uuid tenant_id FK
+        string node_type
+        string canonical_key
+        array aliases
+    }
+    KG_EDGES {
+        uuid id PK
+        uuid src_id FK
+        uuid dst_id FK
+        string edge_type
+    }
+    AUDIT_LOG {
+        uuid id PK
+        uuid tenant_id FK
+        string actor
+        string action
+        jsonb payload
+        timestamp created_at
+    }
+    DOC_CHUNKS {
+        uuid id PK
+        uuid document_id FK
+        int chunk_idx
+        text text
+        vector embedding
+    }
+    ENTITY_MERGE_PROPOSALS {
+        uuid id PK
+        uuid tenant_id FK
+        string node_type
+        string proposed_key
+        string matched_key
+        float score
+        string status
+    }</pre>
+<p><strong>RLS-enforced tables (12)</strong>: <code>api_keys</code>, <code>documents</code>, <code>extractions</code>, <code>patterns</code>, <code>corrections</code>, <code>anomalies</code>, <code>kg_nodes</code>, <code>kg_edges</code>, <code>audit_log</code>, <code>batches</code>, <code>doc_chunks</code>, <code>entity_merge_proposals</code>.</p>
+<p><strong>Not RLS-enforced</strong>: <code>tenants</code> (the index itself), <code>packs</code> (global), <code>cost_events</code> (admin-only).</p>
+<hr>
+<h2 id="appendix-c-repository-layout">Appendix C · Repository layout</h2>
+<div class="highlight"><pre><span></span><code>mdi/
+├── pyproject.toml                  # dependencies + tooling
+├── docker-compose.yml              # postgres + redis for local dev
+├── alembic.ini                     # migration runner
+├── migrations/versions/            # 0001..0004 + future
+├── .env.example                    # env template (no secrets)
+├── README.md                       # quickstart runbook
+├── CLAUDE.md                       # locked decisions for AI sessions
+├── MODULE_GUIDE.md                 # consumer integration guide
+├── PIPELINE_AND_FRAMEWORK.md       # developer-facing pipeline detail
+├── GAP_ANALYSIS.md                 # current loose ends
+├── ARCHITECTURE_OVERVIEW.md        # THIS DOCUMENT
+├── src/mdi/
+│   ├── kernel/                     # 7 modules — ingest, llm_gateway, auth, ...
+│   ├── brain/                      # 14 modules — 7 organs + 7 supporting layers
+│   ├── orchestrator/               # pipeline + progress events
+│   ├── models/                     # Pydantic v2 + SQLAlchemy
+│   ├── api/                        # FastAPI routes + deps
+│   ├── ui/                         # Streamlit analyst console
+│   ├── eval/                       # stage_eval + exports + harness
+│   └── packs/                      # 6 packs — base + 5 verticals
+└── tests/
+    ├── unit/                       # 44 offline tests
+    ├── integration/                # two_tenant_isolation + smoke
+    ├── live_llm/                   # 5 opt-in tests (--run-live)
+    └── fixtures/sample_docs/       # cross-industry corpus
+</code></pre></div>
+<hr>
+<h2 id="references-for-the-architect">References for the architect</h2>
+<table>
+<thead>
+<tr>
+<th>Doc</th>
+<th>When you need it</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>README.md</code></td>
+<td>Day-1 setup, "how do I run this?"</td>
+</tr>
+<tr>
+<td><code>CLAUDE.md</code></td>
+<td>"Why this decision and not another?"</td>
+</tr>
+<tr>
+<td><code>PIPELINE_AND_FRAMEWORK.md</code></td>
+<td>Deep dive on the 19 stages and the 7-organ brain</td>
+</tr>
+<tr>
+<td><code>MODULE_GUIDE.md</code></td>
+<td>Embedding MDI into another codebase</td>
+</tr>
+<tr>
+<td><code>GAP_ANALYSIS.md</code></td>
+<td>"What's missing before production?"</td>
+</tr>
+<tr>
+<td><code>mdi/src/mdi/packs/business_documents_base/</code></td>
+<td>Canonical pack example to copy-paste from</td>
+</tr>
+<tr>
+<td><code>synthesis_doc.docx</code> (Ishtiuk + Jeeva)</td>
+<td>Original architectural rationale (Appendix A.7 specifies the 13-slot pack contract)</td>
+</tr>
+</tbody>
+</table>
+<hr>
+<p><em>Generated by the MDI platform team. For questions, open an issue or talk to Hari.</em></p>
+  </div>
+  <footer>Generated from <code>ARCHITECTURE_OVERVIEW.md</code> · MDI Platform Team</footer>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'base',
+      themeVariables: {
+        primaryColor: '#1F2A44',
+        primaryTextColor: '#E5E7EB',
+        primaryBorderColor: '#6366F1',
+        lineColor: '#9CA3AF',
+        secondaryColor: '#312E81',
+        tertiaryColor: '#374151',
+        background: '#FFFFFF',
+        mainBkg: '#1F2A44',
+        nodeBorder: '#6366F1',
+        clusterBkg: '#FAFAFA',
+        clusterBorder: '#D1D5DB',
+        edgeLabelBackground: '#FFFFFF',
+        fontFamily: '-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, sans-serif'
+      }
+    });
+  </script>
+</body>
+</html>

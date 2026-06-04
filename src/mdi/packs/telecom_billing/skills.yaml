@@ -1,0 +1,35 @@
+version: 1.0.0-draft
+name: telecom_billing
+description: |
+  Telecom carrier document processing — invoices, customer service
+  records (CSRs), master service agreements, and usage reports. Demonstrated
+  in the synthesis POC across AT&T, Verizon, T-Mobile, CenturyLink.
+
+  This is a DRAFT template (per synthesis Appendix A.2). Customize for
+  the carriers and service types your tenant actually sees before tagging
+  v1.0.0.
+
+classifier:
+  signals: classifier/signals.yaml
+  fallback: llm
+
+field_schema: schema/fields.yaml
+doc_type_taxonomy: schema/doc_types.yaml
+
+extract_prompts:
+  invoice: prompts/invoice.md
+  customer_service_record: prompts/csr.md
+  contract: prompts/contract.md
+  usage_report: prompts/usage_report.md
+
+merge_rules: rules/merge.yaml
+validators: rules/validators.yaml
+
+enrichment:
+  domain_codes: enrichment/codes.yaml
+  alias_map: enrichment/aliases.yaml
+
+compliance:
+  business_rules: rules/compliance.yaml
+
+golden_seed: ../../eval/golden/telecom_billing/

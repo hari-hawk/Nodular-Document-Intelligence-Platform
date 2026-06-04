@@ -1,0 +1,36 @@
+version: 1.0.0-draft
+name: legal_hr
+description: |
+  Legal and HR contract processing — service agreements, NDAs, employment
+  agreements, offer letters, amendments. Demonstrated in the synthesis
+  POC and detailed in Appendix A.6.
+
+  The platform-specific value here is the auto-renew detector and the
+  clause classifier — both are signals analysts use to triage contracts
+  by deadline / risk.
+
+classifier:
+  signals: classifier/signals.yaml
+  fallback: llm
+
+field_schema: schema/fields.yaml
+doc_type_taxonomy: schema/doc_types.yaml
+
+extract_prompts:
+  contract: prompts/contract.md
+  nda: prompts/nda.md
+  employment_agreement: prompts/employment.md
+  offer_letter: prompts/offer.md
+  amendment: prompts/amendment.md
+
+merge_rules: rules/merge.yaml
+validators: rules/validators.yaml
+
+enrichment:
+  domain_codes: enrichment/codes.yaml
+  alias_map: enrichment/aliases.yaml
+
+compliance:
+  business_rules: rules/compliance.yaml
+
+golden_seed: ../../eval/golden/legal_hr/

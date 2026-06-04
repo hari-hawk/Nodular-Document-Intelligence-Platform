@@ -1,0 +1,8 @@
+compliance:
+  data_retention_days: 2555    # 7 years — typical telco audit window
+  pii_redaction:
+    enabled: true
+    fields: [phone_numbers]    # mask middle 4 digits on export when policy=strict
+  audit:
+    log_reads: true
+    log_writes: true

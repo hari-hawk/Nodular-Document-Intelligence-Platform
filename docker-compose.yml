@@ -1,0 +1,32 @@
+services:
+  postgres:
+    image: pgvector/pgvector:pg15
+    container_name: mdi-postgres
+    environment:
+      POSTGRES_USER: mdi
+      POSTGRES_PASSWORD: mdi
+      POSTGRES_DB: mdi
+    ports:
+      - "5532:5432"   # alt host port to avoid colliding with other local pg
+    volumes:
+      - mdi_pg_data:/var/lib/postgresql/data
+      - ./scripts/db_init.sql:/docker-entrypoint-initdb.d/00_init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mdi -d mdi"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: mdi-redis
+    ports:
+      - "6479:6379"   # alt host port to avoid colliding with other local redis
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  mdi_pg_data:

@@ -1,0 +1,11 @@
+doc_types:
+  contract:
+    aliases: [agreement, msa, sow, services_agreement, license_agreement]
+  nda:
+    aliases: [non_disclosure_agreement, confidentiality_agreement, mutual_nda]
+  employment_agreement:
+    aliases: [employment_contract, employee_agreement]
+  offer_letter:
+    aliases: [offer, employment_offer]
+  amendment:
+    aliases: [addendum, supplement, change_order]

@@ -1,0 +1,28 @@
+pack: healthcare_claims
+accuracy_target: 0.90
+# NOTE on PHI: synthetic patient_id values only. NO real patient names / DOB.
+# The no_patient_name_leaked validator should pass on every case here.
+cases:
+  - filename: claim_837_001.txt
+    expected:
+      provider_name: "Wellness Medical Group, PLLC"
+      provider_npi: "1487654329"
+      payer_name: "BlueCross BlueShield of Massachusetts"
+      claim_number: "CLM-2026-04-91182"
+      patient_id: "PAT-558491"
+      total_charge: 1847.50
+
+  - filename: remit_835_001.txt
+    expected:
+      provider_npi: "1487654329"
+      payer_name: "BlueCross BlueShield of Massachusetts"
+      claim_number: "CLM-2026-04-91182"
+      total_charge: 1847.50
+      total_paid: 1602.30
+
+  - filename: prior_auth_001.txt
+    expected:
+      provider_name: "Northridge Cardiology Associates"
+      provider_npi: "1881220947"
+      payer_name: "UnitedHealthcare"
+      patient_id: "PAT-7723104"

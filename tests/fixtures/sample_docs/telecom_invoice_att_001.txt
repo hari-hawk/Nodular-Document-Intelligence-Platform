@@ -1,0 +1,29 @@
+AT&T Business Services
+Account Number: 0133442501
+Customer: Globex Inc.
+Bill To: 350 Fifth Avenue, New York, NY 10118
+
+Invoice Number: ATT-INV-2026-04-7711
+Invoice Date: 2026-04-30
+Service Period: 2026-04-01 through 2026-04-30
+Due Date: 2026-05-25
+
+SERVICE SUMMARY
+================================================================
+  Service Type        Quantity    Unit Price    MRC Total
+----------------------------------------------------------------
+  DIA 1 Gbps          1           1,250.00      1,250.00
+  SIP Trunk - 25      1           425.00          425.00
+  Hosted VoIP Seats   18           19.99          359.82
+  MPLS T1 (E. Coast)  1           780.00          780.00
+
+Phone Numbers on Account:
+  +1 (212) 555-0101
+  +1 (212) 555-0102
+  +1 (212) 555-0103
+
+Subtotal:           USD 2,814.82
+Federal/State Tax:  USD   239.26
+TOTAL DUE:          USD 3,054.08
+
+Contract Reference: MSA-AT&T-Globex-2024-09

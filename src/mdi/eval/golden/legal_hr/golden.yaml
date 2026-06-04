@@ -1,0 +1,32 @@
+pack: legal_hr
+accuracy_target: 0.90
+# `parties` is a list; the harness's flat-equality check doesn't handle lists,
+# so we leave that field unasserted and lean on scalar fields here. Future
+# work: extend the harness with list/dict comparison.
+cases:
+  - filename: msa_001.txt
+    expected:
+      agreement_number: "MSA-Globex-Initech-2026-04"
+      effective_date: "2026-04-01"
+      expiration_date: "2028-03-31"
+      term_months: 24
+      total_contract_value: 720000.00
+      currency: USD
+      auto_renew: true
+      auto_renew_notice_days: 90
+      governing_law: "New York"
+
+  - filename: nda_001.txt
+    expected:
+      agreement_type: "Mutual NDA"
+      effective_date: "2026-03-15"
+      confidentiality_term_years: 5
+      governing_law: "California"
+
+  - filename: offer_letter_001.txt
+    expected:
+      position_title: "Senior Software Engineer"
+      start_date: "2026-06-15"
+      base_salary: 195000
+      currency: USD
+      governing_law: "California"

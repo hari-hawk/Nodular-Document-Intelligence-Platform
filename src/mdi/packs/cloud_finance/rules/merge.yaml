@@ -1,0 +1,5 @@
+merge_rules:
+  fields_by_doc_type:
+    invoice: [total, subtotal, discounts, tax, due_date, charges_by_service]
+    statement: [billing_period_start, billing_period_end, total]
+    cost_explorer_export: [charges_by_service, billing_period_start, billing_period_end]

@@ -1,0 +1,8 @@
+merge_rules:
+  fields_by_doc_type:
+    contract: [parties, total_contract_value, annual_spend_cap, term_months, effective_date, expiration_date, auto_renew, auto_renew_notice_days, governing_law]
+    nda: [confidentiality_term_years, parties, effective_date]
+    employment_agreement: [position_title, base_salary, start_date, parties]
+    offer_letter: [position_title, base_salary, start_date]
+    # Amendments override the parent contract on the fields they touch.
+    amendment: [expiration_date, term_months, auto_renew, total_contract_value, annual_spend_cap, payment_terms]

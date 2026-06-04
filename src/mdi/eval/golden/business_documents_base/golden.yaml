@@ -1,0 +1,9 @@
+pack: business_documents_base
+accuracy_target: 0.90
+cases:
+  - filename: sample_invoice.txt
+    expected:
+      vendor: "Acme Corp"
+      total: 1234.56
+      currency: USD
+      document_number: INV-1001

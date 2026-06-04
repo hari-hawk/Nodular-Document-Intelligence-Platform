@@ -1,0 +1,32 @@
+aliases:
+  uom:
+    each: ea
+    eaches: ea
+    pcs: ea
+    piece: ea
+    pieces: ea
+    kg: kg
+    kilo: kg
+    kilogram: kg
+    kilograms: kg
+    lb: lb
+    lbs: lb
+    pound: lb
+    pounds: lb
+    metre: m
+    meter: m
+    metres: m
+    meters: m
+    ft: ft
+    foot: ft
+    feet: ft
+    in: in
+    inch: in
+    inches: in
+    litre: L
+    litres: L
+    liter: L
+    liters: L
+    gal: gal
+    gallon: gal
+    gallons: gal

@@ -1,0 +1,37 @@
+version: 1.0.0-draft
+name: healthcare_claims
+description: |
+  Medical claims processing — 837 professional claims, 835 remittance
+  advices, prior authorisations, and lab reports. Demonstrates the
+  architecture's PHI guardrails (Appendix A.4).
+
+  PHI WARNING: this pack assumes the deployment has a security review,
+  the compliance.business_rules below are enforced at the storage
+  layer (not just app), and the operator has BAA agreements with the
+  LLM provider(s) where applicable. Do not enable on a tenant that
+  hasn't passed that gate.
+
+classifier:
+  signals: classifier/signals.yaml
+  fallback: llm
+
+field_schema: schema/fields.yaml
+doc_type_taxonomy: schema/doc_types.yaml
+
+extract_prompts:
+  claim_837: prompts/claim_837.md
+  remit_835: prompts/remit_835.md
+  prior_auth: prompts/prior_auth.md
+  lab_report: prompts/lab_report.md
+
+merge_rules: rules/merge.yaml
+validators: rules/validators.yaml
+
+enrichment:
+  domain_codes: enrichment/codes.yaml
+  alias_map: enrichment/aliases.yaml
+
+compliance:
+  business_rules: rules/compliance.yaml
+
+golden_seed: ../../eval/golden/healthcare_claims/

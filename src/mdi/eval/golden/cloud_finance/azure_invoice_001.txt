@@ -1,0 +1,24 @@
+Microsoft Azure
+Invoice
+
+Subscription: 3f29c1b8-7d4e-44ab-9e2c-128f7a55a991
+Tenant: Initech Holdings
+Invoice Number: AZ-2026-05-INV-77419
+Invoice Date: 2026-05-15
+Billing Period: 2026-04-01 to 2026-04-30
+Currency: USD
+Due: 2026-06-14
+
+CHARGES BY SERVICE
+=================================================================
+  Service                       Region        Usage         Amount
+-----------------------------------------------------------------
+  Virtual Machines              eastus        6,210 hr      2,890.40
+  Azure Storage                 eastus        18.2 TB         415.10
+  Azure SQL Database            eastus        744 hr          612.00
+  Azure Functions               eastus        140M req        184.30
+  Azure CDN                     global         5.1 TB          291.60
+
+Subtotal:                    USD 4,393.40
+Tax:                              197.70
+TOTAL DUE:                   USD 4,591.10

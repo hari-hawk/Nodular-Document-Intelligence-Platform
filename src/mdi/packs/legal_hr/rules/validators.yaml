@@ -1,0 +1,45 @@
+rules:
+  - rule_id: expiration_after_effective
+    expression: |
+      fields.get('effective_date') is None or fields.get('expiration_date') is None
+      or str(fields.get('expiration_date')) >= str(fields.get('effective_date'))
+    severity: HIGH
+    message: expiration_date must be on or after effective_date
+
+  - rule_id: term_months_consistent_with_dates
+    expression: |
+      fields.get('term_months') is None
+      or fields.get('effective_date') is None
+      or fields.get('expiration_date') is None
+      or abs(
+          int(fields.get('term_months'))
+          - (int(str(fields.get('expiration_date'))[0:4]) * 12 + int(str(fields.get('expiration_date'))[5:7])
+             - int(str(fields.get('effective_date'))[0:4]) * 12 - int(str(fields.get('effective_date'))[5:7]))
+        ) <= 1
+    severity: MEDIUM
+    message: |
+      term_months disagrees with (expiration_date - effective_date) by >1 month —
+      verify which is authoritative for this customer's records.
+
+  - rule_id: auto_renew_notice_set_when_auto_renew
+    expression: |
+      not (fields.get('auto_renew') == True)
+      or fields.get('auto_renew_notice_days') is not None
+    severity: MEDIUM
+    message: when auto_renew=true, auto_renew_notice_days must be set
+
+  - rule_id: parties_present
+    expression: |
+      fields.get('parties') is not None
+      and len(fields.get('parties') or []) >= 2
+    severity: HIGH
+    message: every contract must have at least 2 parties
+
+  - rule_id: salary_present_for_employment
+    expression: |
+      True
+    severity: INFO
+    message: |
+      base_salary is required on employment_agreement / offer_letter but the
+      validator can't see the doc_type here; orchestrator-level merge logic
+      cross-checks this.

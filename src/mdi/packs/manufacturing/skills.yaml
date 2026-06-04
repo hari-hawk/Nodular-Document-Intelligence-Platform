@@ -1,0 +1,35 @@
+version: 1.0.0-draft
+name: manufacturing
+description: |
+  Manufacturing procurement and supply-chain — purchase orders, bills of
+  lading, supplier invoices, quality reports. Demonstrated in the
+  synthesis POC and detailed in Appendix A.5.
+
+  The signature feature is the three-way match: PO + receipt (BoL) +
+  invoice reconcile to the same line items + quantities + amounts before
+  payment is approved. Validators encode that invariant.
+
+classifier:
+  signals: classifier/signals.yaml
+  fallback: llm
+
+field_schema: schema/fields.yaml
+doc_type_taxonomy: schema/doc_types.yaml
+
+extract_prompts:
+  purchase_order: prompts/purchase_order.md
+  bol: prompts/bol.md
+  supplier_invoice: prompts/supplier_invoice.md
+  quality_report: prompts/quality_report.md
+
+merge_rules: rules/merge.yaml
+validators: rules/validators.yaml
+
+enrichment:
+  domain_codes: enrichment/codes.yaml
+  alias_map: enrichment/aliases.yaml
+
+compliance:
+  business_rules: rules/compliance.yaml
+
+golden_seed: ../../eval/golden/manufacturing/

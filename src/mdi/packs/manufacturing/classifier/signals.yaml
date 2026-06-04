@@ -1,0 +1,13 @@
+signals:
+  purchase_order:
+    keywords: ["purchase order", "p.o.", "po number", "buyer", "required by", "promised delivery"]
+    weight: 1.0
+  bol:
+    keywords: ["bill of lading", "bol", "shipping document", "carrier", "received by", "consignee", "packing slip"]
+    weight: 1.0
+  supplier_invoice:
+    keywords: ["invoice", "remit to", "supplier invoice", "terms net"]
+    weight: 0.9
+  quality_report:
+    keywords: ["quality report", "certificate of analysis", "coa", "inspection", "lot number", "batch", "pass", "fail"]
+    weight: 0.9

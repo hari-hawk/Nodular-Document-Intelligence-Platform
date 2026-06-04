@@ -1,0 +1,9 @@
+doc_types:
+  invoice:
+    aliases: [bill, billing_statement, telco_invoice]
+  customer_service_record:
+    aliases: [csr, service_inventory, csi]
+  contract:
+    aliases: [msa, master_service_agreement, sow, statement_of_work]
+  usage_report:
+    aliases: [cdr, call_detail_record, usage_statement, traffic_report]

@@ -1,0 +1,24 @@
+aliases:
+  service_type:
+    "Dedicated Internet Access": DIA
+    "Dedicated Internet": DIA
+    "MPLS T1": MPLS
+    "MPLS Circuit": MPLS
+    "SD-WAN": SDWAN
+    "SD WAN": SDWAN
+    "SIP Trunk": SIP
+    "SIP Trunking": SIP
+    "Hosted Voice": HostedVoIP
+    "Hosted VoIP Seat": HostedVoIP
+    "Hosted VoIP": HostedVoIP
+    "PRI": POTS
+    "Analog Line": POTS
+    "Business Class Internet": Broadband
+    "Cable Internet": Broadband
+
+  carrier:
+    "AT&T Business Services": AT&T
+    "AT&T Mobility": AT&T
+    "Verizon Business": Verizon
+    "Lumen Technologies": Lumen
+    "CenturyLink Communications": CenturyLink

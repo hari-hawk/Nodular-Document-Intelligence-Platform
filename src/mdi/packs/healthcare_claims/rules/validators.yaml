@@ -1,0 +1,38 @@
+rules:
+  - rule_id: npi_is_10_digits
+    expression: |
+      fields.get('provider_npi') is None
+      or len(str(fields.get('provider_npi'))) == 10
+    severity: HIGH
+    message: provider_npi must be exactly 10 digits
+
+  - rule_id: npi_is_numeric
+    expression: |
+      fields.get('provider_npi') is None
+      or str(fields.get('provider_npi')).isdigit()
+    severity: HIGH
+    message: provider_npi must be digit-only (no spaces, hyphens, or letters)
+
+  - rule_id: date_of_service_not_future
+    expression: |
+      fields.get('date_of_service') is None
+      or str(fields.get('date_of_service')) <= '2099-12-31'
+    severity: LOW
+    message: date_of_service sanity-check
+
+  - rule_id: total_paid_le_total_charge
+    expression: |
+      fields.get('total_charge') is None or fields.get('total_paid') is None
+      or float(fields.get('total_paid')) <= float(fields.get('total_charge')) + 0.01
+    severity: HIGH
+    message: total_paid cannot exceed total_charge (after $0.01 rounding)
+
+  - rule_id: no_patient_name_leaked
+    expression: |
+      fields.get('patient_id') is None
+      or 'patient' not in str(fields.get('patient_id')).lower()
+      or len(str(fields.get('patient_id'))) <= 32
+    severity: HIGH
+    message: |
+      patient_id appears to contain a name rather than an opaque ID.
+      Review the extraction prompt and the source document — this is a PHI risk.

@@ -1,0 +1,7 @@
+merge_rules:
+  # The three-way match: each doc type owns a different piece of the truth.
+  fields_by_doc_type:
+    purchase_order: [promised_delivery_date, line_items, subtotal, currency]
+    bol: [actual_delivery_date, bol_number]
+    supplier_invoice: [invoice_number, total, tax, shipping]
+    quality_report: [lot_number, inspection_result]

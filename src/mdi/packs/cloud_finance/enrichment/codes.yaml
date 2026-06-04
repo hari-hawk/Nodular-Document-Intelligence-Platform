@@ -1,0 +1,51 @@
+providers:
+  - AWS
+  - Azure
+  - GCP
+  - OracleCloud
+
+aws_services:
+  - EC2
+  - S3
+  - Lambda
+  - RDS
+  - DynamoDB
+  - CloudFront
+  - CloudWatch
+  - SQS
+  - SNS
+  - VPC
+  - ELB
+  - ECS
+  - EKS
+  - DataTransfer
+
+azure_services:
+  - VirtualMachines
+  - Storage
+  - SQLDatabase
+  - CosmosDB
+  - Functions
+  - AppService
+  - CDN
+
+gcp_services:
+  - ComputeEngine
+  - CloudStorage
+  - BigQuery
+  - CloudSQL
+  - CloudFunctions
+  - CloudRun
+
+regions:
+  - us-east-1
+  - us-east-2
+  - us-west-1
+  - us-west-2
+  - eu-west-1
+  - eu-central-1
+  - ap-southeast-1
+  - ap-northeast-1
+  - global
+
+currencies: [USD, EUR, GBP, JPY, AUD, INR, CAD, SGD]

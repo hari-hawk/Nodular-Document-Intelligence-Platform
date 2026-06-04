@@ -1,0 +1,30 @@
+service_types:
+  - DIA
+  - MPLS
+  - SDWAN
+  - POTS
+  - SIP
+  - HostedVoIP
+  - Broadband
+  - BackupCircuit
+  - Other
+
+carriers:
+  - AT&T
+  - Verizon
+  - T-Mobile
+  - Lumen
+  - CenturyLink
+  - Comcast Business
+  - Spectrum Business
+  - Cox Business
+  - Frontier
+  - BT
+  - Vodafone
+
+currencies:
+  - USD
+  - EUR
+  - GBP
+  - CAD
+  - AUD

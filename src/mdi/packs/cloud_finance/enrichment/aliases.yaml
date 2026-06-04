@@ -1,0 +1,21 @@
+aliases:
+  provider:
+    "Amazon Web Services": AWS
+    "Microsoft Azure": Azure
+    "Microsoft Corporation": Azure
+    "Google Cloud Platform": GCP
+    "Google LLC": GCP
+    "Oracle Cloud Infrastructure": OracleCloud
+    "OCI": OracleCloud
+
+  service:
+    "Amazon EC2": EC2
+    "Amazon S3": S3
+    "Amazon RDS": RDS
+    "Amazon Lambda": Lambda
+    "AWS Lambda": Lambda
+    "Microsoft Compute Engine": ComputeEngine
+    "Cloud Storage (Standard)": CloudStorage
+    "BigQuery Analysis": BigQuery
+    "Amazon EC2 - On Demand": EC2
+    "Amazon EC2 - Reserved": EC2

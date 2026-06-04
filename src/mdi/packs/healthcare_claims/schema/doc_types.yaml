@@ -1,0 +1,9 @@
+doc_types:
+  claim_837:
+    aliases: [claim, 837, 837p, 837i, professional_claim, institutional_claim]
+  remit_835:
+    aliases: [remit, 835, era, electronic_remittance_advice, eob]
+  prior_auth:
+    aliases: [prior_authorization, preauth, pa_request, authorization]
+  lab_report:
+    aliases: [lab_result, pathology_report, diagnostic_report]

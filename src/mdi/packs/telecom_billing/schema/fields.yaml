@@ -1,0 +1,71 @@
+fields:
+  # Core counterparty
+  - name: carrier
+    type: string
+    required: true
+    description: Issuing carrier (AT&T, Verizon, T-Mobile, CenturyLink, Lumen, etc.)
+  - name: customer
+    type: string
+    required: true
+    description: Billed party
+  - name: account_number
+    type: string
+    required: true
+    description: Carrier-assigned account number (preserve leading zeros)
+  - name: contract_reference
+    type: string
+    required: false
+    description: MSA / SOW reference that authorises this billing
+  # Document basics
+  - name: invoice_number
+    type: string
+    required: false
+    description: Carrier-side invoice / billing reference
+  - name: document_date
+    type: date
+    required: false
+    description: Bill issue date (ISO 8601)
+  - name: service_period_start
+    type: date
+    required: false
+    description: Beginning of the billing period
+  - name: service_period_end
+    type: date
+    required: false
+    description: End of the billing period
+  - name: due_date
+    type: date
+    required: false
+    description: Payment due date
+  # Telecom-specific lines
+  - name: service_lines
+    type: list
+    required: false
+    description: |
+      Each line: {service_type, quantity, unit_price, mrc_total}.
+      service_type one of: DIA, MPLS, SDWAN, POTS, SIP, HostedVoIP,
+      Broadband, BackupCircuit, Other.
+  - name: phone_numbers
+    type: list
+    required: false
+    description: E.164-formatted numbers belonging to this account
+  # Financials
+  - name: currency
+    type: string
+    required: false
+    description: ISO 4217 (USD/EUR/GBP)
+  - name: subtotal
+    type: currency
+    required: false
+  - name: tax
+    type: currency
+    required: false
+    description: Federal + state surcharges combined
+  - name: total
+    type: currency
+    required: false
+    description: Total due for this billing period
+
+primary_keys:
+  - account_number
+  - invoice_number

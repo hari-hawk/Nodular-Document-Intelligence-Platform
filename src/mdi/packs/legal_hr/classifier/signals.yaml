@@ -1,0 +1,16 @@
+signals:
+  contract:
+    keywords: ["master services agreement", "services agreement", "license agreement", "this agreement", "effective date", "term"]
+    weight: 0.9
+  nda:
+    keywords: ["non-disclosure", "confidentiality agreement", "mutual nda", "confidential information"]
+    weight: 1.0
+  employment_agreement:
+    keywords: ["employment agreement", "employment contract", "duties", "at-will", "compensation", "base salary"]
+    weight: 1.0
+  offer_letter:
+    keywords: ["offer of employment", "offer letter", "we are pleased to offer", "your start date"]
+    weight: 1.0
+  amendment:
+    keywords: ["amendment", "addendum", "this amendment to", "amends the", "change order"]
+    weight: 1.0

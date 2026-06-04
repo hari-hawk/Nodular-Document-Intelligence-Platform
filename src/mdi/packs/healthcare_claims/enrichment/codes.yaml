@@ -1,0 +1,29 @@
+code_systems: [ICD-10, ICD-9, CPT, HCPCS, NDC, CARC, RARC]
+
+# A tiny sample of common payer aliases — real customers will extend.
+common_payers:
+  - "BlueCross BlueShield"
+  - "UnitedHealthcare"
+  - "Aetna"
+  - "Cigna"
+  - "Humana"
+  - "Medicare"
+  - "Medicaid"
+  - "Anthem"
+  - "Kaiser Permanente"
+
+# Common-and-suggestive ICD-10 prefixes — used for sanity checks, not authority.
+icd10_chapters:
+  - "A00-B99"  # Infectious
+  - "C00-D48"  # Neoplasms
+  - "E00-E89"  # Endocrine
+  - "F01-F99"  # Mental
+  - "I00-I99"  # Circulatory
+  - "J00-J99"  # Respiratory
+  - "K00-K95"  # Digestive
+  - "M00-M99"  # Musculoskeletal
+  - "N00-N99"  # Genitourinary
+  - "O00-O9A"  # Pregnancy
+  - "R00-R99"  # Symptoms
+  - "S00-T88"  # Injury
+  - "Z00-Z99"  # Encounter

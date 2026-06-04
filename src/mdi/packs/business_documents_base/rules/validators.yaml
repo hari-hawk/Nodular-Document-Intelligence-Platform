@@ -1,0 +1,25 @@
+rules:
+  - rule_id: total_equals_subtotal_plus_tax
+    expression: |
+      fields.get('total') is None or fields.get('subtotal') is None
+      or abs(float(fields.get('total')) - (float(fields.get('subtotal')) + float(fields.get('tax') or 0))) < 0.02
+    severity: HIGH
+    message: total should equal subtotal + tax (within rounding)
+
+  - rule_id: total_nonneg
+    expression: (fields.get('total') or 0) >= 0
+    severity: HIGH
+    message: total must be non-negative
+
+  - rule_id: due_after_doc_date
+    expression: |
+      fields.get('document_date') is None or fields.get('due_date') is None
+      or str(fields.get('due_date')) >= str(fields.get('document_date'))
+    severity: MEDIUM
+    message: due_date must be on or after document_date
+
+  - rule_id: currency_is_iso4217
+    expression: |
+      fields.get('currency') is None or len(str(fields.get('currency'))) == 3
+    severity: LOW
+    message: currency should be a 3-letter ISO 4217 code

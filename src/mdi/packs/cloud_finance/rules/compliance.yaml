@@ -1,0 +1,7 @@
+compliance:
+  data_retention_days: 2555    # 7 years — typical finance audit window
+  pii_redaction:
+    enabled: false              # cloud bills don't typically carry PII
+  audit:
+    log_reads: true
+    log_writes: true

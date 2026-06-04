@@ -1,0 +1,30 @@
+rules:
+  - rule_id: total_equals_subtotal_minus_discount_plus_tax
+    expression: |
+      fields.get('total') is None or fields.get('subtotal') is None
+      or abs(float(fields.get('total')) - (
+           float(fields.get('subtotal'))
+           + float(fields.get('discounts') or 0)
+           + float(fields.get('tax') or 0)
+         )) < 0.02
+    severity: HIGH
+    message: total should equal subtotal + discounts(negative) + tax
+
+  - rule_id: discounts_are_non_positive
+    expression: (fields.get('discounts') or 0) <= 0
+    severity: MEDIUM
+    message: discounts must be expressed as zero or negative
+
+  - rule_id: billing_period_ordered
+    expression: |
+      fields.get('billing_period_start') is None or fields.get('billing_period_end') is None
+      or str(fields.get('billing_period_end')) >= str(fields.get('billing_period_start'))
+    severity: MEDIUM
+    message: billing_period_end must be on or after billing_period_start
+
+  - rule_id: provider_known
+    expression: |
+      fields.get('provider') is None
+      or str(fields.get('provider')).upper() in ('AWS', 'AZURE', 'GCP', 'ORACLECLOUD')
+    severity: LOW
+    message: provider should be one of AWS/Azure/GCP/OracleCloud

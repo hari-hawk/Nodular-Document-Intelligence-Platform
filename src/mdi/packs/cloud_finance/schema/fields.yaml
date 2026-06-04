@@ -1,0 +1,67 @@
+fields:
+  - name: provider
+    type: string
+    required: true
+    description: AWS, Azure, GCP, OracleCloud
+  - name: customer
+    type: string
+    required: true
+    description: Billed account/organisation name
+  - name: account_number
+    type: string
+    required: true
+    description: Provider account ID (12-digit AWS, GUID Azure, project-id GCP)
+  - name: invoice_number
+    type: string
+    required: false
+  - name: document_date
+    type: date
+    required: false
+  - name: billing_period_start
+    type: date
+    required: false
+  - name: billing_period_end
+    type: date
+    required: false
+  - name: due_date
+    type: date
+    required: false
+  - name: charges_by_service
+    type: list
+    required: false
+    description: |
+      [{service, region, usage_amount, usage_unit, charge}] —
+      service uses canonical names (EC2, S3, Lambda, BigQuery, ...)
+      after stripping provider prefixes.
+  - name: cost_center
+    type: string
+    required: false
+    description: Tenant cost-center slug from tenant_config.cost_center_map
+  - name: gl_code
+    type: string
+    required: false
+    description: GL code resolved from cost_center via tenant_config
+  - name: currency
+    type: string
+    required: false
+  - name: subtotal
+    type: currency
+    required: false
+  - name: discounts
+    type: currency
+    required: false
+    description: EDP / committed-spend / private-pricing discounts (negative)
+  - name: tax
+    type: currency
+    required: false
+  - name: total
+    type: currency
+    required: false
+  - name: usd_total
+    type: currency
+    required: false
+    description: total normalised to USD via booking-date FX
+
+primary_keys:
+  - account_number
+  - invoice_number

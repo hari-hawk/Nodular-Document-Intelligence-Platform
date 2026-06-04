@@ -1,0 +1,26 @@
+pack: cloud_finance
+accuracy_target: 0.90
+cases:
+  - filename: aws_invoice_001.txt
+    expected:
+      provider: AWS
+      account_number: "872194204911"
+      invoice_number: "EMEA1-INV-2026-04-119872"
+      total: 4324.28
+      currency: USD
+
+  - filename: azure_invoice_001.txt
+    expected:
+      provider: Azure
+      account_number: "3f29c1b8-7d4e-44ab-9e2c-128f7a55a991"
+      invoice_number: "AZ-2026-05-INV-77419"
+      total: 4591.10
+      currency: USD
+
+  - filename: gcp_invoice_001.txt
+    expected:
+      provider: GCP
+      account_number: "hooli-prod-platform-7821"
+      invoice_number: "GCP-INV-2026-05-1187420"
+      total: 3246.83
+      currency: USD

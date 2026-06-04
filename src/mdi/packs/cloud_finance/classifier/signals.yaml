@@ -1,0 +1,10 @@
+signals:
+  invoice:
+    keywords: ["invoice", "amount due", "aws account", "azure subscription", "billing account", "amazon web services"]
+    weight: 1.0
+  statement:
+    keywords: ["account statement", "monthly summary", "consolidated billing"]
+    weight: 0.9
+  cost_explorer_export:
+    keywords: ["cost and usage report", "cost explorer", "billing export", "cur", "usage line item"]
+    weight: 0.9

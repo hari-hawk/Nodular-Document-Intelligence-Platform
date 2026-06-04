@@ -1,0 +1,66 @@
+fields:
+  - name: buyer
+    type: string
+    required: true
+  - name: supplier
+    type: string
+    required: true
+  - name: po_number
+    type: string
+    required: true
+    description: PO number; persists across PO + BoL + invoice
+  - name: invoice_number
+    type: string
+    required: false
+  - name: bol_number
+    type: string
+    required: false
+    description: Bill of lading reference
+  - name: document_date
+    type: date
+    required: false
+  - name: promised_delivery_date
+    type: date
+    required: false
+  - name: actual_delivery_date
+    type: date
+    required: false
+    description: Populated from the BoL when received
+  - name: line_items
+    type: list
+    required: false
+    description: |
+      [{part_number, description, quantity, uom, unit_price, amount}] —
+      uom uses canonical short codes: kg, lb, g, m, ft, in, ea, L, gal.
+  - name: ship_to
+    type: string
+    required: false
+  - name: bill_to
+    type: string
+    required: false
+  - name: currency
+    type: string
+    required: false
+  - name: subtotal
+    type: currency
+    required: false
+  - name: tax
+    type: currency
+    required: false
+  - name: shipping
+    type: currency
+    required: false
+  - name: total
+    type: currency
+    required: false
+  # Quality report specifics
+  - name: lot_number
+    type: string
+    required: false
+  - name: inspection_result
+    type: string
+    required: false
+    description: pass | fail | conditional
+
+primary_keys:
+  - po_number

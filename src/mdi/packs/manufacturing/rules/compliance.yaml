@@ -1,0 +1,10 @@
+compliance:
+  data_retention_days: 2555    # 7 years — standard finance audit window
+  pii_redaction:
+    enabled: false              # Manufacturing docs don't typically carry PII
+  audit:
+    log_reads: true
+    log_writes: true
+  three_way_match:
+    enabled: true               # The platform should enforce PO+BoL+invoice match
+    tolerance_pct: 0.02         # 2% line-item amount tolerance before flagging

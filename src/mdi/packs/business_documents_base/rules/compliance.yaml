@@ -1,0 +1,8 @@
+compliance:
+  # Cross-vertical baseline. Vertical packs override.
+  data_retention_days: 2555  # 7 years
+  pii_redaction:
+    enabled: false  # generic pack; vertical packs override (e.g. healthcare)
+  audit:
+    log_reads: true
+    log_writes: true

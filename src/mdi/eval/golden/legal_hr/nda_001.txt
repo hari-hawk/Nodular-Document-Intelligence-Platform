@@ -1,0 +1,21 @@
+MUTUAL NON-DISCLOSURE AGREEMENT
+
+This Mutual Non-Disclosure Agreement ("NDA") is entered into between:
+
+  Party A:  Hooli Inc., a Delaware corporation
+            350 Page Mill Road, Palo Alto, CA 94304
+  Party B:  Pied Piper, Inc., a Delaware corporation
+            899 Beacon Street, Palo Alto, CA 94301
+
+Effective Date: 2026-03-15
+Agreement Type: Mutual NDA
+
+Both parties may disclose Confidential Information for the purpose
+of evaluating a potential business relationship.
+
+CONFIDENTIALITY TERM
+  Each party shall protect the other's Confidential Information for
+  five (5) years from the date of disclosure.
+
+GOVERNING LAW
+  State of California.

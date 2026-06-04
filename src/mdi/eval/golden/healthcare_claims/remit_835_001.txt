@@ -1,0 +1,29 @@
+REMITTANCE ADVICE — 835
+
+Payer:    BlueCross BlueShield of Massachusetts
+Payer ID: 00125
+Check Number: 4421988
+Check Date:   2026-05-07
+
+Provider Name: Wellness Medical Group, PLLC
+Provider NPI:  1487654329
+
+REFERS TO CLAIM
+  Claim Number:    CLM-2026-04-91182
+  Date of Service: 2026-04-15
+  Patient ID:      PAT-558491
+  Total Billed:    USD 1,847.50
+  Total Paid:      USD 1,602.30
+
+ADJUSTMENT CODES
+  CARC 45   Charge exceeds fee schedule    -195.00
+  CARC 253  Sequestration reduction        -32.05
+  RARC N390 Member responsibility           -18.15
+
+SERVICE-LINE PAYMENTS
+  Line  CPT     Billed   Paid     Adjustment
+  1     99214   245.00   217.20   -27.80
+  2     80053    52.50    52.50     0.00
+  3     83036    95.00    78.10   -16.90
+  4     93000    78.00    65.30   -12.70
+  5     J3490 1,377.00 1,189.20  -187.80

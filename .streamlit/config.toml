@@ -1,0 +1,23 @@
+# Professional dark theme — Stitch-inspired palette
+# Primary: indigo-500 for accents; backgrounds anchored on slate-950/900.
+
+[theme]
+base = "dark"
+primaryColor = "#6366F1"           # indigo-500
+backgroundColor = "#0B1020"        # near-black with a slight blue cast
+secondaryBackgroundColor = "#141B2D"  # card / panel background
+textColor = "#E5E7EB"              # slate-200
+font = "sans serif"
+
+[server]
+headless = true
+runOnSave = true
+fileWatcherType = "auto"
+port = 8501
+
+[browser]
+gatherUsageStats = false
+
+[client]
+toolbarMode = "minimal"
+showErrorDetails = true

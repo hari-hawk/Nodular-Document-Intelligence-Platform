@@ -1,0 +1,13 @@
+signals:
+  claim_837:
+    keywords: ["837", "professional claim", "institutional claim", "rendering provider", "billing provider"]
+    weight: 1.0
+  remit_835:
+    keywords: ["835", "remittance advice", "era", "explanation of benefits", "eob", "claim adjustment"]
+    weight: 1.0
+  prior_auth:
+    keywords: ["prior authorization", "preauth", "pre-authorization", "authorization request"]
+    weight: 0.9
+  lab_report:
+    keywords: ["lab report", "pathology report", "diagnostic report", "specimen", "test result"]
+    weight: 0.9

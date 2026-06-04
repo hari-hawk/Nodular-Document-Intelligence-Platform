@@ -1,0 +1,35 @@
+version: 1.0.0-draft
+name: cloud_finance
+description: |
+  Cloud cost and vendor spend management — AWS, Azure, GCP, Oracle Cloud
+  invoices and statements through one kernel. Demonstrated in the synthesis
+  POC and detailed in Appendix A.3.
+
+  Customisation knobs (tenant_config JSONB):
+    cost_center_map:  {"slug": "GL-code", ...}
+    base_currency:    "USD"  (variance flagger anchors here)
+    variance_pct:     0.15   (flag spend deviations larger than this)
+
+classifier:
+  signals: classifier/signals.yaml
+  fallback: llm
+
+field_schema: schema/fields.yaml
+doc_type_taxonomy: schema/doc_types.yaml
+
+extract_prompts:
+  invoice: prompts/invoice.md
+  statement: prompts/statement.md
+  cost_explorer_export: prompts/cost_explorer.md
+
+merge_rules: rules/merge.yaml
+validators: rules/validators.yaml
+
+enrichment:
+  domain_codes: enrichment/codes.yaml
+  alias_map: enrichment/aliases.yaml
+
+compliance:
+  business_rules: rules/compliance.yaml
+
+golden_seed: ../../eval/golden/cloud_finance/

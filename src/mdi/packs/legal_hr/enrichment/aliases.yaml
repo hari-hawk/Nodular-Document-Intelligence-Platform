@@ -1,0 +1,31 @@
+aliases:
+  clause_type:
+    "Termination": termination
+    "Payment Terms": payment
+    "Compensation": payment
+    "IP Assignment": ip_assignment
+    "Intellectual Property": ip_assignment
+    "Non-Compete": non_compete
+    "Noncompete": non_compete
+    "Non-Solicitation": non_solicit
+    "Confidentiality": confidentiality
+    "Confidential Information": confidentiality
+    "Indemnification": indemnification
+    "Limitation of Liability": limitation_of_liability
+    "Renewal": auto_renew
+    "Auto-Renewal": auto_renew
+    "Governing Law": governing_law
+    "Dispute Resolution": dispute_resolution
+    "Arbitration": dispute_resolution
+    "Warranty": warranty
+    "Force Majeure": force_majeure
+  role:
+    "Disclosing Party": disclosing_party
+    "Receiving Party": receiving_party
+    "Service Provider": service_provider
+    "Vendor": service_provider
+    "Client": customer
+    "Customer": customer
+    "Employee": employee
+    "Employer": employer
+    "Company": employer

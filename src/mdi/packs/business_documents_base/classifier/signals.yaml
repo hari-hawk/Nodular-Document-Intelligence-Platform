@@ -1,0 +1,16 @@
+signals:
+  invoice:
+    keywords: ["invoice", "bill to", "amount due", "invoice number"]
+    weight: 1.0
+  purchase_order:
+    keywords: ["purchase order", "p.o. number", "po number", "buyer"]
+    weight: 1.0
+  contract:
+    keywords: ["agreement", "this contract", "effective date", "term"]
+    weight: 0.9
+  statement:
+    keywords: ["statement", "account summary", "previous balance"]
+    weight: 0.9
+  receipt:
+    keywords: ["receipt", "paid", "transaction id", "thank you for your"]
+    weight: 0.8

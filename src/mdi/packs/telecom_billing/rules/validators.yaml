@@ -1,0 +1,28 @@
+rules:
+  - rule_id: total_equals_subtotal_plus_tax
+    expression: |
+      fields.get('total') is None or fields.get('subtotal') is None
+      or abs(float(fields.get('total')) - (float(fields.get('subtotal')) + float(fields.get('tax') or 0))) < 0.02
+    severity: HIGH
+    message: total should equal subtotal + tax (within $0.02 rounding)
+
+  - rule_id: service_period_ordered
+    expression: |
+      fields.get('service_period_start') is None or fields.get('service_period_end') is None
+      or str(fields.get('service_period_end')) >= str(fields.get('service_period_start'))
+    severity: MEDIUM
+    message: service_period_end must be on or after service_period_start
+
+  - rule_id: due_after_invoice_date
+    expression: |
+      fields.get('document_date') is None or fields.get('due_date') is None
+      or str(fields.get('due_date')) >= str(fields.get('document_date'))
+    severity: MEDIUM
+    message: due_date must be on or after document_date
+
+  - rule_id: account_number_preserves_leading_zero
+    expression: |
+      fields.get('account_number') is None
+      or len(str(fields.get('account_number'))) >= 8
+    severity: LOW
+    message: account_number too short — common cause is a lost leading zero

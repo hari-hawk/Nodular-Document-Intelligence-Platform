@@ -1,0 +1,8 @@
+merge_rules:
+  # Per the synthesis doc Section A.2:
+  #   invoice supplies billing; CSR supplies inventory; contract supplies term
+  fields_by_doc_type:
+    contract: [committed_total, service_period_start, service_period_end, contract_reference, service_lines]
+    invoice: [total, subtotal, tax, document_date, due_date]
+    customer_service_record: [service_lines, phone_numbers]
+    usage_report: [service_period_start, service_period_end]

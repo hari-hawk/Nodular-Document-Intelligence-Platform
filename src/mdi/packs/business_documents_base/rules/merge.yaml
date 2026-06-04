@@ -1,0 +1,10 @@
+merge_rules:
+  # When the same document number appears in multiple groups, prefer the
+  # contract as the authoritative source for `total` (committed) and the
+  # invoice as the authoritative source for `total` (billed).
+  fields_by_doc_type:
+    contract: [committed_total, document_date, due_date]
+    invoice: [billed_total, line_items, tax, currency]
+    purchase_order: [committed_total, line_items]
+    receipt: [paid_total, document_date]
+    statement: [billed_total]

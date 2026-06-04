@@ -1,0 +1,66 @@
+fields:
+  # Provider side
+  - name: provider_name
+    type: string
+    required: true
+  - name: provider_npi
+    type: string
+    required: true
+    description: 10-digit NPI; validators check Luhn
+  - name: provider_tax_id
+    type: string
+    required: false
+  # Payer side
+  - name: payer_name
+    type: string
+    required: true
+  - name: payer_id
+    type: string
+    required: false
+  - name: plan_name
+    type: string
+    required: false
+  # Patient — PHI; handle per compliance rules
+  - name: patient_id
+    type: string
+    required: false
+    description: Internal patient identifier (NOT name/DOB — those are PHI)
+  - name: subscriber_id
+    type: string
+    required: false
+    description: Member ID on the insurance card
+  # Document identifiers
+  - name: claim_number
+    type: string
+    required: false
+  - name: claim_date
+    type: date
+    required: false
+  - name: date_of_service
+    type: date
+    required: false
+  # Diagnoses + services
+  - name: diagnoses
+    type: list
+    required: false
+    description: "[{code_system: ICD-10|ICD-9, code, primary: bool, description}]"
+  - name: service_lines
+    type: list
+    required: false
+    description: "[{date, cpt_or_hcpcs, modifier, units, charge, ndc?}]"
+  # Financials
+  - name: total_charge
+    type: currency
+    required: false
+  - name: total_paid
+    type: currency
+    required: false
+    description: Only populated on 835 remits
+  - name: adjustment_codes
+    type: list
+    required: false
+    description: CARC/RARC codes from a 835 explanation of benefits
+
+primary_keys:
+  - claim_number
+  - provider_npi

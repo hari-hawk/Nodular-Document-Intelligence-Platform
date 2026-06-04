@@ -1,0 +1,106 @@
+"""Typed settings — single source of truth for env-driven configuration."""
+from __future__ import annotations
+
+from functools import lru_cache
+from pathlib import Path
+
+from pydantic import Field
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+class Settings(BaseSettings):
+    model_config = SettingsConfigDict(
+        env_file=".env", env_file_encoding="utf-8", extra="ignore"
+    )
+
+    # LLM — Gemini
+    google_api_key: str = ""
+    gemini_model_flash: str = "gemini-2.5-flash"
+    gemini_model_pro: str = "gemini-2.5-pro"
+
+    # LLM — Anthropic
+    anthropic_api_key: str = ""
+    claude_model_haiku: str = "claude-haiku-4-5"
+    claude_model_sonnet: str = "claude-sonnet-4-5"
+    claude_model_opus: str = "claude-opus-4-1"
+
+    # LLM — defaults
+    llm_timeout_seconds: int = 120
+    llm_max_retries: int = 4
+    # 'gemini' | 'anthropic' | 'auto' (auto = follow provider_router policy)
+    default_provider: str = "auto"
+
+    # Cost
+    daily_spend_cap_usd: float = 5.00
+    cost_soft_warn_pct: float = 0.80
+    cost_hard_cap_pct: float = 1.00
+
+    # DB
+    database_url: str = "postgresql+psycopg://mdi:mdi@localhost:5432/mdi"
+    database_url_async: str = "postgresql+asyncpg://mdi:mdi@localhost:5432/mdi"
+    db_pool_size: int = 10
+    db_max_overflow: int = 20
+
+    # Redis / queue
+    redis_url: str = "redis://localhost:6379/0"
+    celery_broker_url: str = "redis://localhost:6379/1"
+    celery_result_backend: str = "redis://localhost:6379/2"
+
+    # Auth
+    jwt_secret: str = "change-me-in-production"
+    jwt_algorithm: str = "HS256"
+    jwt_ttl_minutes: int = 720
+    # Admin auth — gates POST /admin/* endpoints (tenant onboarding, key issuance).
+    # Compared via constant-time equality against the X-Admin-Key header.
+    # In production this would be a separate RBAC role; for local mode an
+    # env-var-managed shared secret is sufficient.
+    admin_api_key: str = "local-dev-admin-key"
+
+    # Embeddings
+    embed_model: str = "BAAI/bge-m3"
+    embed_device: str = "cpu"
+    # When True, Hippocampus + RAG use the real sentence-transformers model
+    # (semantic similarity, ~2GB download on first load, ~30s warm-up).
+    # When False, a deterministic SHA-based stub is used (instant, but only
+    # identical inputs hit the memory). Default is False for local-dev /
+    # tests; flip to True in production to enable the full self-training loop.
+    use_real_embeddings: bool = False
+
+    # Observability
+    langfuse_public_key: str = ""
+    langfuse_secret_key: str = ""
+    langfuse_host: str = "https://cloud.langfuse.com"
+
+    # Page-limit gate
+    page_limit_soft: int = 10
+    page_limit_hard: int = 200
+
+    # API
+    api_host: str = "0.0.0.0"
+    api_port: int = 8080
+    cors_origins: str = "http://localhost:3000,http://localhost:8501"
+
+    # Pipeline
+    organ_concurrency: int = 5
+    batch_timeout_seconds: int = 900
+
+    # Conscience safety
+    enable_invented_rules: bool = False
+    entity_resolver_threshold: int = Field(default=85, ge=0, le=100)
+
+    @property
+    def cors_origins_list(self) -> list[str]:
+        return [o.strip() for o in self.cors_origins.split(",") if o.strip()]
+
+    @property
+    def package_root(self) -> Path:
+        return Path(__file__).resolve().parents[1]
+
+    @property
+    def packs_dir(self) -> Path:
+        return self.package_root / "packs"
+
+
+@lru_cache(maxsize=1)
+def get_settings() -> Settings:
+    return Settings()

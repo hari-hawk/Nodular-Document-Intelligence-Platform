@@ -1,0 +1,7 @@
+doc_types:
+  invoice:
+    aliases: [bill, billing_statement, aws_invoice, azure_invoice, gcp_invoice]
+  statement:
+    aliases: [account_statement, monthly_summary]
+  cost_explorer_export:
+    aliases: [cost_export, cur, cost_and_usage_report, billing_export]

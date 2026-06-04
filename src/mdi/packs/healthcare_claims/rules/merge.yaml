@@ -1,0 +1,6 @@
+merge_rules:
+  fields_by_doc_type:
+    claim_837: [diagnoses, service_lines, total_charge, date_of_service]
+    remit_835: [total_paid, adjustment_codes]
+    prior_auth: [diagnoses, service_lines, date_of_service]
+    lab_report: [diagnoses, date_of_service]

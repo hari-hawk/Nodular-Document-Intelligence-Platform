@@ -1,0 +1,29 @@
+Amazon Web Services
+Invoice
+
+Account Number: 872194204911
+Account Name: Globex Inc. — Engineering
+Invoice Number: EMEA1-INV-2026-04-119872
+Invoice Date: 2026-05-01
+Period: 2026-04-01 to 2026-04-30
+Currency: USD
+Due Date: 2026-05-31
+
+CHARGES BY SERVICE
+=================================================================
+  Service                     Region        Usage         Amount
+-----------------------------------------------------------------
+  Amazon EC2 - On Demand      us-east-1     14,832 hr     2,158.43
+  Amazon EC2 - Reserved       us-east-1     8,640 hr        687.92
+  Amazon S3 - Standard        us-east-1     21.4 TB         492.20
+  Amazon RDS - PostgreSQL     us-east-1     744 hr          410.00
+  Amazon CloudFront           Global        4.8 TB          340.80
+  AWS Lambda                  Multi         98M req         195.40
+  AWS Data Transfer Out       Multi         3.2 TB          291.20
+
+Subtotal (USD):              4,575.95
+EDP Discount:                 -457.59
+Tax:                            205.92
+TOTAL DUE:                   USD 4,324.28
+
+Cost Center: ENG-PLATFORM

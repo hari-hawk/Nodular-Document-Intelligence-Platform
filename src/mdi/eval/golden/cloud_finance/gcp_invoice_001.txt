@@ -1,0 +1,27 @@
+Google Cloud Platform
+Invoice
+
+Billing Account: hooli-engineering-prod
+Project ID: hooli-prod-platform-7821
+Invoice Number: GCP-INV-2026-05-1187420
+Invoice Date: 2026-05-08
+Period: 2026-04-01 to 2026-04-30
+Currency: USD
+Net Due: 2026-06-07
+
+CHARGES BY SERVICE
+=================================================================
+  Service                     Region              Usage      Amount
+-------------------------------------------------------------------
+  Compute Engine              us-central1         8,940 hr  2,310.40
+  Cloud Storage               multi-region        14.8 TB     298.40
+  BigQuery Analysis           us-central1         18.2 TB     291.20
+  Cloud Functions             us-central1         110M req    150.80
+  Cloud SQL - PostgreSQL      us-central1         744 hr      385.00
+
+Subtotal:                  USD 3,435.80
+Committed Use Discount:    USD  -343.58
+Tax:                       USD   154.61
+TOTAL DUE:                 USD 3,246.83
+
+Cost Center: ENG-DATA

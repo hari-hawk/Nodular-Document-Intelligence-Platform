@@ -1,0 +1,11 @@
+compliance:
+  data_retention_days: 2920    # 8 years — longer because contracts often outlive employees / vendors
+  pii_redaction:
+    enabled: true
+    fields: [parties]            # employee names live in parties for employment docs
+    policy: "strict"
+  audit:
+    log_reads: true
+    log_writes: true
+  signature_workflow:
+    enabled: false              # Off by default; flip on if the tenant has DocuSign / Lumin wired in

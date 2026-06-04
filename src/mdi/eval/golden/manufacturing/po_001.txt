@@ -1,0 +1,25 @@
+PURCHASE ORDER
+
+Buyer:    Acme Manufacturing, Inc.
+Address:  4200 Industrial Park Dr, Cleveland, OH 44135
+
+Supplier: Precision Components Co.
+Address:  18 Mill Lane, Pittsburgh, PA 15201
+
+PO Number:               PO-2026-04-9981
+PO Date:                 2026-04-12
+Promised Delivery Date:  2026-05-15
+Ship To:                 Acme Manufacturing — Receiving Dock 3
+
+LINE ITEMS
+=================================================================
+  Part Number     Description              Qty   UoM   Unit Price  Amount
+-----------------------------------------------------------------
+  PC-44128        Stainless bushing 12mm   500   ea    3.20       1,600.00
+  PC-67721        Titanium bracket A2      120   ea   18.50       2,220.00
+  PC-99014        Steel coil 6mm           4     kg  175.00         700.00
+
+Subtotal:        USD 4,520.00
+Tax:             USD   362.10
+Shipping:        USD    85.00
+TOTAL:           USD 4,967.10

@@ -1,0 +1,25 @@
+PRIOR AUTHORIZATION REQUEST
+
+Provider Name: Northridge Cardiology Associates
+Provider NPI:  1881220947
+Tax ID:        47-8821109
+
+Payer:    UnitedHealthcare
+Payer ID: 87726
+
+Patient ID:     PAT-7723104
+Subscriber ID:  UHC-988-7245-002
+Date of Service: 2026-06-12 (planned)
+
+REQUESTED PROCEDURES
+  CPT 93306   Echocardiogram with Doppler          1 unit
+  CPT 93000   Electrocardiogram                    1 unit
+  CPT 78451   Myocardial perfusion imaging         1 unit
+
+SUPPORTING DIAGNOSES
+  ICD-10  I25.10  Atherosclerotic heart disease (primary)
+  ICD-10  I20.9   Angina pectoris, unspecified
+  ICD-10  R07.9   Chest pain, unspecified
+
+Clinical Justification: Patient presents with new-onset chest pain
+and family history of CAD. Cardiac workup medically necessary.

@@ -1,0 +1,25 @@
+BILL OF LADING
+
+Carrier:   Midwest Freight Lines
+BoL Number: BOL-MFL-2026-05-771219
+
+Shipper:   Precision Components Co.
+           18 Mill Lane, Pittsburgh, PA 15201
+
+Consignee: Acme Manufacturing, Inc.
+           4200 Industrial Park Dr, Cleveland, OH 44135
+           Attn: Receiving Dock 3
+
+PO Reference: PO-2026-04-9981
+Pickup Date:  2026-05-10
+Delivery Date: 2026-05-13
+
+ITEMS RECEIVED
+=================================================================
+  Part Number     Description              Qty   UoM
+-----------------------------------------------------------------
+  PC-44128        Stainless bushing 12mm   500   ea
+  PC-67721        Titanium bracket A2      120   ea
+  PC-99014        Steel coil 6mm           4     kg
+
+Received in good condition. Signed: J. Martinez, Receiving Supervisor

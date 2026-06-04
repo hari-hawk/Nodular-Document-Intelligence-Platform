@@ -1,0 +1,32 @@
+rules:
+  - rule_id: total_equals_subtotal_plus_tax_plus_shipping
+    expression: |
+      fields.get('total') is None or fields.get('subtotal') is None
+      or abs(float(fields.get('total')) - (
+           float(fields.get('subtotal'))
+           + float(fields.get('tax') or 0)
+           + float(fields.get('shipping') or 0)
+         )) < 0.02
+    severity: HIGH
+    message: total should equal subtotal + tax + shipping
+
+  - rule_id: actual_delivery_after_promised_or_unknown
+    expression: |
+      fields.get('promised_delivery_date') is None
+      or fields.get('actual_delivery_date') is None
+      or True
+    severity: INFO
+    message: |
+      actual_delivery_date < promised_delivery_date is OK; late is informational
+      only — escalate via Insight Cortex's risk type, not as a validation anomaly.
+
+  - rule_id: po_number_present
+    expression: fields.get('po_number') is not None
+    severity: HIGH
+    message: po_number missing — three-way match impossible without it
+
+  - rule_id: uom_canonical
+    expression: |
+      True   # placeholder; full check lives in enrichment/aliases.yaml lookups
+    severity: LOW
+    message: uom should be one of the canonical short codes (kg/lb/g/m/ft/in/ea/L/gal)

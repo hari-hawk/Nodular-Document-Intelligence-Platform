@@ -1,0 +1,48 @@
+fields:
+  - name: vendor
+    type: string
+    required: true
+    description: Issuer / counterparty
+  - name: customer
+    type: string
+    required: false
+    description: Recipient / billed party
+  - name: document_number
+    type: string
+    required: false
+    description: Invoice / PO / contract number
+  - name: account_number
+    type: string
+    required: false
+    description: Account or customer reference
+  - name: document_date
+    type: date
+    required: false
+    description: Document issue date (ISO 8601)
+  - name: due_date
+    type: date
+    required: false
+    description: Payment / expiry date
+  - name: currency
+    type: string
+    required: false
+    description: ISO 4217 code (USD, EUR, GBP, ...)
+  - name: subtotal
+    type: currency
+    required: false
+    description: Pre-tax amount
+  - name: tax
+    type: currency
+    required: false
+    description: Tax amount
+  - name: total
+    type: currency
+    required: false
+    description: Grand total
+  - name: line_items
+    type: list
+    required: false
+    description: Line-item objects with description / quantity / unit_price / amount
+
+primary_keys:
+  - document_number

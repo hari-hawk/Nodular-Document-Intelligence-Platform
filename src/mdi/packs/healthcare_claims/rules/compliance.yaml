@@ -1,0 +1,17 @@
+compliance:
+  data_retention_days: 2555    # 7 years — HIPAA minimum is 6 (state laws vary)
+  pii_redaction:
+    enabled: true
+    fields:
+      - patient_id              # mask in exports if policy=strict
+      - subscriber_id
+    policy: "strict"            # operator must verify BAA + access controls
+  audit:
+    log_reads: true             # log every read of PHI-tagged fields
+    log_writes: true
+  hipaa:
+    phi_fields:
+      - patient_id
+      - subscriber_id
+    redaction_on_export: true
+    breach_notification_workflow: "ops/runbooks/phi-breach.md"  # operator authors

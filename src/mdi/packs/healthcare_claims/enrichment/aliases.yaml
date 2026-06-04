@@ -1,0 +1,9 @@
+aliases:
+  payer:
+    "BCBS": "BlueCross BlueShield"
+    "UHC": "UnitedHealthcare"
+    "United Healthcare": "UnitedHealthcare"
+  code_system:
+    "ICD10": "ICD-10"
+    "ICD-10-CM": "ICD-10"
+    "ICD10-CM": "ICD-10"

@@ -1,0 +1,25 @@
+Verizon Business
+Account: 8841220199
+Bill To: Initech Holdings, LLC
+1900 N. Akard Street, Dallas, TX 75201
+
+Invoice Number: VZB-2026-05-1148820
+Invoice Date: 2026-05-15
+Billing Period: 2026-05-01 to 2026-05-31
+Payment Due: 2026-06-10
+
+SERVICES PROVIDED
+=========================================================
+  Description                          Qty   Charge
+---------------------------------------------------------
+  Dedicated Internet 500 Mbps          1     1,450.00
+  MPLS Backbone Connection (Dallas)    1       820.00
+  SD-WAN Premium Tier                  1       350.00
+  Hosted VoIP — Standard Seats         42      881.58
+  Toll-Free Inbound (per minute)       1       125.00
+
+Subtotal:          USD 3,626.58
+Tax + Surcharges:  USD   312.45
+AMOUNT DUE:        USD 3,939.03
+
+Contract: VZB-MSA-Initech-2025-02

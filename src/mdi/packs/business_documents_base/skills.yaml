@@ -1,0 +1,33 @@
+version: 1.0.0
+name: business_documents_base
+description: |
+  Cross-vertical default pack. Used when a tenant has not been assigned
+  to a specific industry pack but wants schema guarantees beyond
+  open-vocabulary mode. Covers invoice, purchase_order, contract,
+  statement, receipt at a generic level.
+
+classifier:
+  signals: classifier/signals.yaml
+  fallback: llm
+
+field_schema: schema/fields.yaml
+doc_type_taxonomy: schema/doc_types.yaml
+
+extract_prompts:
+  invoice: prompts/invoice.md
+  purchase_order: prompts/purchase_order.md
+  contract: prompts/contract.md
+  statement: prompts/statement.md
+  receipt: prompts/receipt.md
+
+merge_rules: rules/merge.yaml
+validators: rules/validators.yaml
+
+enrichment:
+  domain_codes: enrichment/codes.yaml
+  alias_map: enrichment/aliases.yaml
+
+compliance:
+  business_rules: rules/compliance.yaml
+
+golden_seed: ../../eval/golden/business_documents_base/

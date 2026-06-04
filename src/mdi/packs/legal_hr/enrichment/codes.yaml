@@ -1,0 +1,44 @@
+clause_types:
+  - termination
+  - payment
+  - ip_assignment
+  - non_compete
+  - non_solicit
+  - confidentiality
+  - indemnification
+  - limitation_of_liability
+  - auto_renew
+  - governing_law
+  - dispute_resolution
+  - warranty
+  - force_majeure
+
+party_roles:
+  - buyer
+  - seller
+  - service_provider
+  - customer
+  - licensor
+  - licensee
+  - employer
+  - employee
+  - disclosing_party
+  - receiving_party
+
+us_states:
+  - AL
+  - AK
+  - AZ
+  - CA
+  - CO
+  - DC
+  - DE
+  - FL
+  - GA
+  - IL
+  - MA
+  - NJ
+  - NY
+  - PA
+  - TX
+  - WA

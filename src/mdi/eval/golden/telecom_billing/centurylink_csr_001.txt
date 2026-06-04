@@ -1,0 +1,24 @@
+CenturyLink (Lumen Technologies)
+CUSTOMER SERVICE RECORD
+
+Account Number: LMN-44729108
+Customer Name: Hooli Inc.
+Service Address: 350 Page Mill Road, Palo Alto, CA 94304
+
+PROVISIONED SERVICES
+=========================================================
+  Service Type           Quantity   Status
+---------------------------------------------------------
+  DIA 100 Mbps           1          Active
+  MPLS WAN circuit       2          Active
+  Backup Cable Internet  1          Active
+  POTS Lines             4          Active
+
+PHONE NUMBERS ON ACCOUNT
+  +1 (650) 555-0188
+  +1 (650) 555-0189
+  +1 (650) 555-0190
+  +1 (650) 555-0191
+
+Master Service Agreement: CenturyLink-Hooli-2023-11
+Effective Date: 2024-01-01

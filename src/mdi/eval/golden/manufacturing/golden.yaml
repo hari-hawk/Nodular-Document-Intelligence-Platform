@@ -1,0 +1,29 @@
+pack: manufacturing
+accuracy_target: 0.90
+# All three docs reference the same po_number so the three-way match path
+# is exercised (PO + BoL + supplier_invoice = same PO-2026-04-9981).
+cases:
+  - filename: po_001.txt
+    expected:
+      buyer: "Acme Manufacturing, Inc."
+      supplier: "Precision Components Co."
+      po_number: "PO-2026-04-9981"
+      total: 4967.10
+      currency: USD
+
+  - filename: bol_001.txt
+    expected:
+      buyer: "Acme Manufacturing, Inc."
+      supplier: "Precision Components Co."
+      po_number: "PO-2026-04-9981"
+      bol_number: "BOL-MFL-2026-05-771219"
+      actual_delivery_date: "2026-05-13"
+
+  - filename: supplier_invoice_001.txt
+    expected:
+      buyer: "Acme Manufacturing, Inc."
+      supplier: "Precision Components Co."
+      po_number: "PO-2026-04-9981"
+      invoice_number: "PCC-INV-2026-05-008842"
+      total: 4967.10
+      currency: USD
