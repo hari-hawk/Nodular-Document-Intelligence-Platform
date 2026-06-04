@@ -104,6 +104,11 @@ jobs:
           SQL
 
       - name: Run alembic migrations
+        # migrations/env.py reads DATABASE_URL — override it for this step so
+        # alembic connects as the superuser `mdi`. The non-superuser mdi_app
+        # used by the app cannot CREATE TABLE in the public schema (PG15+).
+        env:
+          DATABASE_URL: "postgresql+psycopg://mdi:mdi@localhost:5432/mdi"
         run: |
           alembic upgrade head
 
