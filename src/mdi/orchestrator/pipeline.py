@@ -332,6 +332,26 @@ async def run_batch_async(
                         # this is a side-channel feature.
                         logger.warning("auto_pack.hook_failed", error=str(_e))
 
+                    # Wave 2.4 — derive + persist tenant facts from the
+                    # extraction. account→vendor, doc_no→vendor, vendor→
+                    # customer, contract→due_date, vendor→governing_law.
+                    # Future batches read these in Stage 6 to bias Hands
+                    # toward known truths. Opportunistic — never breaks
+                    # the pipeline if it errors.
+                    try:
+                        from mdi.brain.master_data import (
+                            derive_facts_from_extraction,
+                            record_fact,
+                        )
+                        facts = derive_facts_from_extraction(
+                            {k: v.model_dump() for k, v in ex.fields.items()},
+                            document_id=doc.document_id,
+                        )
+                        for f in facts:
+                            await record_fact(db, tid, **f)
+                    except Exception as _e:
+                        logger.warning("tenant_facts.hook_failed", error=str(_e))
+
                     # Stage 9 — memory write
                     pid = await hippo.write_pattern(
                         db, tid, cluster, schema, ruleset, pattern_id=pattern_id

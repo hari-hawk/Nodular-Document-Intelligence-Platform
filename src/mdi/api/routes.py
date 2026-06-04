@@ -739,6 +739,27 @@ async def admin_reject_auto_pack(
 
 
 # ---------------------------------------------------------------------------
+# Tenant facts — per-tenant master-data store (Wave 2.4)
+# ---------------------------------------------------------------------------
+@router.get("/admin/tenant-facts", dependencies=[Depends(require_admin)])
+async def admin_list_tenant_facts(
+    fact_type: str | None = None,
+    limit: int = 500,
+    tenant: Tenant = Depends(current_tenant),
+    db: AsyncSession = Depends(db_session),
+) -> dict[str, Any]:
+    """List facts the brain has learned about this tenant.
+
+    `fact_type` filter is optional; common values: account, document_owner,
+    vendor_customer, contract_expires, governing_law. RLS scopes the
+    query to the current tenant.
+    """
+    from mdi.brain.master_data import get_facts
+    _ = tenant
+    return {"facts": await get_facts(db, fact_type=fact_type, limit=limit)}
+
+
+# ---------------------------------------------------------------------------
 # Spend ledger (Wave 1.4 of the DD uplift)
 # ---------------------------------------------------------------------------
 @router.get("/admin/spend", dependencies=[Depends(require_admin)])
