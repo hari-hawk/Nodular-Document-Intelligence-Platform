@@ -723,4 +723,28 @@ async def admin_reject_auto_pack(
     return result
 
 
+# ---------------------------------------------------------------------------
+# Spend ledger (Wave 1.4 of the DD uplift)
+# ---------------------------------------------------------------------------
+@router.get("/admin/spend", dependencies=[Depends(require_admin)])
+async def admin_spend_snapshot() -> dict[str, Any]:
+    """Cumulative LLM spend across process restarts, broken out by backend.
+
+    This is independent of the daily CostTracker (which lives in-process
+    and resets every restart) — useful for "what did this deployment
+    cost so far?" reporting and capped-trial enforcement.
+    """
+    from mdi.kernel.settings import get_settings
+    from mdi.kernel.spend_ledger import snapshot as _spend_snapshot
+
+    data = _spend_snapshot()
+    s = get_settings()
+    return {
+        "total_usd": data.get("total_usd", 0.0),
+        "by_backend": data.get("by_backend", {}),
+        "cumulative_cap_usd": s.cumulative_spend_cap_usd,
+        "cap_enabled": s.cumulative_spend_cap_usd > 0,
+    }
+
+
 _ = authenticate

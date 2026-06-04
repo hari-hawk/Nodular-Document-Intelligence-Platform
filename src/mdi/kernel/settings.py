@@ -47,6 +47,15 @@ class Settings(BaseSettings):
     daily_spend_cap_usd: float = 5.00
     cost_soft_warn_pct: float = 0.80
     cost_hard_cap_pct: float = 1.00
+    # Cumulative cap surviving across process restarts (file-backed via
+    # mdi.kernel.spend_ledger). 0 = disabled (observer mode); set to a
+    # positive value to enforce a hard cumulative ceiling on LLM spend.
+    # This is checked BEFORE the daily cap so the more restrictive of the
+    # two wins. Useful for capped trials / time-boxed deployments.
+    cumulative_spend_cap_usd: float = 0.0
+    # Directory the spend ledger file lives in. Defaults to the repo root;
+    # production deployments should point this at a persistent volume.
+    data_dir: str = "."
 
     # DB
     database_url: str = "postgresql+psycopg://mdi:mdi@localhost:5432/mdi"

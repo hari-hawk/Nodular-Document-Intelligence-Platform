@@ -251,6 +251,12 @@ class LLMGateway:
             default=0.0,
         )
         await self.cost_tracker.precheck(cheapest)
+        # Cumulative ledger precheck (Wave 1.4). When the cumulative cap
+        # is disabled (settings.cumulative_spend_cap_usd == 0, the default)
+        # this is a no-op. When set, raises SpendCapExceeded BEFORE the
+        # provider call so we don't burn tokens on a doomed request.
+        from mdi.kernel.spend_ledger import precheck as _spend_precheck
+        _spend_precheck(cheapest)
 
         last_exc: BaseException | None = None
         for idx, (prov_name, chosen_model) in enumerate(chain):
@@ -317,6 +323,16 @@ class LLMGateway:
                 request_id=request_id,
             )
             await self.cost_tracker.record(call)
+            # Persist to the cumulative ledger so cross-process / cross-
+            # restart spend is tracked. Backend label is the provider name
+            # so the breakdown is meaningful even when the same model is
+            # served from multiple providers (gemini-via-aistudio vs
+            # gemini-via-vertex, for example).
+            try:
+                from mdi.kernel.spend_ledger import record as _spend_record
+                _spend_record(cost_usd=cost, backend=prov.name)
+            except Exception as _e:
+                logger.warning("spend_ledger.record_failed", error=str(_e))
             trace.end(metadata={
                 "input_tokens": result.input_tokens,
                 "output_tokens": result.output_tokens,
