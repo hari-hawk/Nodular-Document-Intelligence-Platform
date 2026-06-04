@@ -11,6 +11,12 @@ services:
     volumes:
       - mdi_pg_data:/var/lib/postgresql/data
       - ./scripts/db_init.sql:/docker-entrypoint-initdb.d/00_init.sql:ro
+      # Wave 1.5 (DD uplift): bootstrap a separate `langfuse` database
+      # inside the same Postgres instance for the self-hosted Langfuse
+      # service below. Postgres entrypoint runs *.sh files alphabetically;
+      # the `01_` prefix keeps it after 00_init.sql for clarity but the
+      # order doesn't actually matter (different database).
+      - ./scripts/create_langfuse_db.sh:/docker-entrypoint-initdb.d/01_create_langfuse_db.sh:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U mdi -d mdi"]
       interval: 5s
@@ -27,6 +33,33 @@ services:
       interval: 5s
       timeout: 3s
       retries: 10
+
+  # Wave 1.5 of the DD uplift — self-hosted Langfuse for LLM traces.
+  # Off by default at the application layer: MDI's observability shim
+  # (mdi/kernel/observability.py) only emits traces when LANGFUSE_PUBLIC_KEY
+  # and LANGFUSE_SECRET_KEY are set in env. Starting this container alone
+  # does NOTHING to the existing pipeline — you also need to:
+  #   1. open http://localhost:3100, create a project, copy the keys
+  #   2. paste them into .env as LANGFUSE_PUBLIC_KEY / LANGFUSE_SECRET_KEY
+  #   3. restart the FastAPI process
+  # See docs/langfuse-quickstart.md for the full walkthrough.
+  langfuse:
+    image: langfuse/langfuse:2
+    container_name: mdi-langfuse
+    ports:
+      - "3100:3000"
+    environment:
+      DATABASE_URL: postgresql://mdi:mdi@postgres:5432/langfuse
+      # The next three are required by Langfuse on every boot. Values are
+      # local-dev-only — in production these must be unique strong secrets.
+      NEXTAUTH_SECRET: mdi-langfuse-local-dev-not-secret
+      NEXTAUTH_URL: http://localhost:3100
+      SALT: mdi-langfuse-local-dev-salt
+      # Don't ship anonymous usage stats to Langfuse Cloud from local dev.
+      TELEMETRY_ENABLED: "false"
+    depends_on:
+      postgres:
+        condition: service_healthy
 
 volumes:
   mdi_pg_data:
