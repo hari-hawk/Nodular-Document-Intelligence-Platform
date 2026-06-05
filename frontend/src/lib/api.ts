@@ -97,6 +97,9 @@ export type PatternDetail = {
 
 export type BatchSummary = {
   id: string;
+  /** Present when the endpoint was called in admin-auth mode — admins see
+   *  batches across all tenants and need to know which is which. */
+  tenant_id?: string;
   status: string;
   total_documents: number;
   started_at: string | null;
@@ -105,6 +108,13 @@ export type BatchSummary = {
   narrator_preview: string;
   anomaly_count: number;
   insight_count: number;
+};
+
+export type ListBatchesResult = {
+  /** 'admin' when listed via X-Admin-Key (cross-tenant), 'tenant' when
+   *  scoped via X-API-Key (RLS-isolated to one tenant). */
+  auth_mode: "admin" | "tenant";
+  batches: BatchSummary[];
 };
 
 export type BatchReport = {
@@ -166,14 +176,23 @@ class ApiError extends Error {
 async function request<T>(
   path: string,
   init: RequestInit = {},
-  opts: { admin?: boolean } = {},
+  opts: { admin?: boolean; bothAuth?: boolean } = {},
 ): Promise<T> {
   const headers = new Headers(init.headers || {});
   headers.set("Accept", "application/json");
   if (init.body && !headers.has("Content-Type") && !(init.body instanceof FormData)) {
     headers.set("Content-Type", "application/json");
   }
-  if (opts.admin) {
+  // bothAuth: send both keys whichever are present and let the server
+  // pick a mode. Used by endpoints that accept tenant OR admin auth
+  // (currently /batches; the Workspace page lets analysts AND admins
+  // see it without forcing the analyst to know which mode they're in).
+  if (opts.bothAuth) {
+    const ak = getAdminKey();
+    if (ak) headers.set("X-Admin-Key", ak);
+    const tk = getApiKey();
+    if (tk) headers.set("X-API-Key", tk);
+  } else if (opts.admin) {
     const k = getAdminKey();
     if (k) headers.set("X-Admin-Key", k);
   } else {
@@ -205,9 +224,11 @@ export const api = {
 
   getReport: (batchId: string) => request<BatchReport>(`/report/${batchId}`),
 
-  // Wave 3.2 — light-weight list of recent batches for the current tenant.
+  // Wave 3.2 — light-weight list of recent batches.
+  // Accepts EITHER tenant API key OR admin key — both get sent and the
+  // server picks the mode. Admin mode lists across all tenants.
   listBatches: (limit = 20) =>
-    request<{ batches: BatchSummary[] }>(`/batches?limit=${limit}`),
+    request<ListBatchesResult>(`/batches?limit=${limit}`, {}, { bothAuth: true }),
 
   // Wave 3.3 — Hippocampus patterns explorer.
   listPatterns: (params: { industry?: string; limit?: number } = {}) => {

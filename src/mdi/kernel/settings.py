@@ -60,6 +60,13 @@ class Settings(BaseSettings):
     # DB
     database_url: str = "postgresql+psycopg://mdi:mdi@localhost:5432/mdi"
     database_url_async: str = "postgresql+asyncpg://mdi:mdi@localhost:5432/mdi"
+    # Privileged admin DSN — used by cross-tenant admin queries that
+    # need to bypass RLS (e.g. `GET /batches` in admin mode, future
+    # cross-tenant reporting). Defaults to the same URL as the app
+    # DSN — for single-role setups that's correct. In dev/prod where
+    # the app runs under a NOBYPASSRLS role like `mdi_app`, point this
+    # at the superuser DSN so admins can see across tenants.
+    database_url_admin_async: str = "postgresql+asyncpg://mdi:mdi@localhost:5432/mdi"
     db_pool_size: int = 10
     db_max_overflow: int = 20
 

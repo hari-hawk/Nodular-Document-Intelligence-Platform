@@ -46,19 +46,41 @@ export function RecentBatches({
     );
   }
   if (q.isError) {
+    const msg = (q.error as Error).message;
+    // 401 here usually means the user signed in with neither a tenant
+    // API key nor an admin key. Don't shout — explain.
+    const is401 = /\b401\b/.test(msg);
+    if (is401) {
+      return (
+        <Card>
+          <CardBody>
+            <EmptyState
+              icon={<FileStack className="h-8 w-8" />}
+              title="Sign in to see your batches"
+              subtitle={
+                "Provide a tenant API key on the sign-in page to see this " +
+                "tenant's batches, OR an admin key to see batches across all " +
+                "tenants. (You can create a tenant + key from Admin → Tenants.)"
+              }
+            />
+          </CardBody>
+        </Card>
+      );
+    }
     return (
       <Card>
         <CardBody className="flex items-start gap-2 text-sm text-red-600 dark:text-red-400">
           <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
           <div>
-            <div className="font-medium">Couldn't load recent batches.</div>
-            <div className="mt-0.5 text-xs">{(q.error as Error).message}</div>
+            <div className="font-medium">Couldn&apos;t load recent batches.</div>
+            <div className="mt-0.5 text-xs">{msg}</div>
           </div>
         </CardBody>
       </Card>
     );
   }
   const batches = q.data?.batches || [];
+  const authMode = q.data?.auth_mode;
   if (batches.length === 0) {
     return (
       <Card><CardBody>
@@ -92,10 +114,15 @@ export function RecentBatches({
           <div>
             <CardTitle>Recent batches</CardTitle>
             <CardDescription>
-              Click a batch to load its results below.
+              {authMode === "admin"
+                ? "Admin view — listing batches across all tenants. Click any row to load it."
+                : "Click a batch to load its results below."}
             </CardDescription>
           </div>
-          <Badge tone="neutral">{batches.length}</Badge>
+          <div className="flex items-center gap-2">
+            {authMode === "admin" && <Badge tone="brand">admin view</Badge>}
+            <Badge tone="neutral">{batches.length}</Badge>
+          </div>
         </div>
       </CardHeader>
       <CardBody className="p-0">
@@ -122,6 +149,11 @@ export function RecentBatches({
                     <div className="flex items-baseline justify-between gap-2">
                       <span className="font-mono text-xs truncate">
                         {b.id.slice(0, 8)}…
+                        {authMode === "admin" && b.tenant_id && (
+                          <span className="ml-2 text-[rgb(var(--fg-muted))]">
+                            · tenant {b.tenant_id.slice(0, 8)}
+                          </span>
+                        )}
                       </span>
                       <span className="text-xs text-[rgb(var(--fg-muted))] flex items-center gap-1 shrink-0">
                         <Clock className="h-3 w-3" />

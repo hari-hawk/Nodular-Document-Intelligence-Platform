@@ -4,7 +4,7 @@ from __future__ import annotations
 import uuid
 from typing import Any
 
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, File, Header, HTTPException, UploadFile, status
 from pydantic import BaseModel, Field
 from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -60,48 +60,108 @@ async def get_report(
 
 
 # ---------------------------------------------------------------------------
-# /batches — list recent batches for the current tenant (Wave 3.2)
+# /batches — list recent batches (Wave 3.2; admin-or-tenant auth)
 # ---------------------------------------------------------------------------
 @router.get("/batches")
 async def list_batches(
     limit: int = 20,
-    tenant: Tenant = Depends(current_tenant),
-    db: AsyncSession = Depends(db_session),
+    tenant_id_filter: str | None = None,
+    # Accept either tenant API key (default UI path) OR admin key.
+    # We resolve each via header by hand here rather than via
+    # Depends() so a missing tenant key falls through to admin check
+    # instead of 401-ing the request.
+    x_api_key: str | None = Header(default=None, alias="X-API-Key"),
+    x_admin_key: str | None = Header(default=None, alias="X-Admin-Key"),
+    authorization: str | None = Header(default=None),
 ) -> dict[str, Any]:
-    """List recent batches for the current RLS tenant context.
+    """List recent batches. Two auth paths:
 
-    Returns a lightweight summary (no full report payload) — the
-    Workspace page's list view doesn't need the JSONB blob, just enough
-    to render a row and let the user click into /report/{id} for detail.
+    1. Tenant auth (X-API-Key or Authorization: Bearer): RLS-scoped to
+       that tenant, returns their batches only.
+    2. Admin auth (X-Admin-Key): lists batches across ALL tenants. Each
+       row includes tenant_id so the UI can show which tenant a batch
+       belongs to. Optional `?tenant_id=` filters to a single tenant.
+
+    This dual-auth shape exists because the Workspace page is
+    reachable both by analysts signed in to one tenant AND by
+    platform admins exploring the install. The single-auth design
+    surprised users who'd signed in with only the admin key.
     """
-    _ = tenant  # RLS scopes the query via app.tenant_id GUC
+    from mdi.api.deps import authenticate as _auth_tenant
+    from mdi.api.deps import require_admin as _require_admin
+
+    # Try tenant auth first; if no tenant key/JWT given, fall back to
+    # admin auth. If neither succeeds, surface a friendly 401.
+    tenant_uuid: uuid.UUID | None = None
+    is_admin = False
+    if x_api_key or (authorization and authorization.lower().startswith("bearer ")):
+        tenant_uuid = await _auth_tenant(
+            authorization=authorization, x_api_key=x_api_key,
+        )
+    elif x_admin_key:
+        await _require_admin(x_admin_key=x_admin_key)
+        is_admin = True
+    else:
+        raise HTTPException(
+            status.HTTP_401_UNAUTHORIZED,
+            "/batches requires either X-API-Key (tenant) or X-Admin-Key (admin)",
+        )
+
     limit = max(1, min(int(limit), 100))
-    rows = (await db.execute(text(
-        # Pull narrator_summary out of the JSONB report so the list view
-        # can show a one-line preview without loading the whole report.
-        # Same with anomaly + insight counts — useful for sorting / filtering
-        # by "batches that need attention" without an extra round-trip.
-        "SELECT id::text, status, total_documents, started_at, finished_at, "
+
+    # Admin path uses the PRIVILEGED engine (settings.database_url_admin_async)
+    # which is configured at deploy time to a superuser DSN so RLS doesn't
+    # filter — admins see across tenants. Production single-role setups
+    # can leave it equal to the app DSN; the cross-tenant query still
+    # works because no tenant GUC is set, and the policy on tables that
+    # use NULLIF resolves to "all rows" for an unset GUC. The two-engine
+    # design lets the dev defaults match this without app-code changes.
+    from mdi.kernel.auth import get_admin_engine, tenant_session
+    base_select = (
+        "SELECT id::text, tenant_id::text, status, total_documents, started_at, finished_at, "
         "       cost_usd, "
         "       LEFT(COALESCE(report->>'narrator_summary', ''), 240) AS narrator_preview, "
         "       COALESCE(jsonb_array_length(report->'anomalies'), 0) AS anomaly_count, "
         "       COALESCE(jsonb_array_length(report->'insights'), 0) AS insight_count "
         "FROM batches "
-        "ORDER BY started_at DESC "
-        "LIMIT :limit"
-    ), {"limit": limit})).all()
+    )
+
+    if is_admin:
+        engine = get_admin_engine()
+        async with engine.connect() as conn:
+            # Admin can scope to a specific tenant via ?tenant_id=. The
+            # query intentionally bypasses RLS via the privileged role.
+            if tenant_id_filter:
+                rows = (await conn.execute(text(
+                    base_select + "WHERE tenant_id = :tid "
+                    "ORDER BY started_at DESC LIMIT :limit"
+                ), {"tid": tenant_id_filter, "limit": limit})).all()
+            else:
+                rows = (await conn.execute(text(
+                    base_select + "ORDER BY started_at DESC LIMIT :limit"
+                ), {"limit": limit})).all()
+    else:
+        # Tenant path — RLS-scoped via the standard tenant_session path
+        # so we get the same isolation as every other tenant endpoint.
+        async with tenant_session(tenant_uuid) as db:  # type: ignore[arg-type]
+            rows = (await db.execute(text(
+                base_select + "ORDER BY started_at DESC LIMIT :limit"
+            ), {"limit": limit})).all()
+
     return {
+        "auth_mode": "admin" if is_admin else "tenant",
         "batches": [
             {
                 "id": r[0],
-                "status": r[1],
-                "total_documents": r[2],
-                "started_at": str(r[3]) if r[3] else None,
-                "finished_at": str(r[4]) if r[4] else None,
-                "cost_usd": float(r[5] or 0.0),
-                "narrator_preview": r[6] or "",
-                "anomaly_count": int(r[7] or 0),
-                "insight_count": int(r[8] or 0),
+                "tenant_id": r[1],
+                "status": r[2],
+                "total_documents": r[3],
+                "started_at": str(r[4]) if r[4] else None,
+                "finished_at": str(r[5]) if r[5] else None,
+                "cost_usd": float(r[6] or 0.0),
+                "narrator_preview": r[7] or "",
+                "anomaly_count": int(r[8] or 0),
+                "insight_count": int(r[9] or 0),
             }
             for r in rows
         ],

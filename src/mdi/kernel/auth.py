@@ -91,6 +91,30 @@ def get_engine() -> AsyncEngine:
     return _engine
 
 
+_admin_engine: AsyncEngine | None = None
+
+
+def get_admin_engine() -> AsyncEngine:
+    """Privileged engine for cross-tenant admin queries.
+
+    Uses settings.database_url_admin_async which by default points at
+    the same URL as the app DSN; production deploys override it to a
+    SUPERUSER DSN so admins can bypass RLS. The app code never uses
+    this engine — only the admin-only endpoints that explicitly need
+    cross-tenant visibility.
+    """
+    global _admin_engine
+    if _admin_engine is None:
+        s = get_settings()
+        _admin_engine = create_async_engine(
+            s.database_url_admin_async,
+            pool_size=2,
+            max_overflow=2,
+            future=True,
+        )
+    return _admin_engine
+
+
 def reset_engine() -> None:
     """Drop the cached engine — for tests with throwaway DBs."""
     global _engine, _sessionmaker
