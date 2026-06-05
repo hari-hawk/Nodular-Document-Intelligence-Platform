@@ -1,23 +1,23 @@
 "use client";
 
+import {
+  Alert, Box, Card, CardContent, Chip, Skeleton, Stack, Typography,
+} from "@mui/material";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { AlertCircle, Clock, FileStack, Sparkles } from "lucide-react";
 
 import { api, type BatchReport, type BatchSummary } from "@/lib/api";
-import { cn } from "@/lib/cn";
-import { Badge, Card, CardBody, CardDescription, CardHeader, CardTitle, EmptyState, SkeletonRows } from "./ui";
 
 /**
- * Recent-batches list. Sits between Upload and Selected-batch on the
- * Workspace page. Each row is a button that loads the full report and
- * pushes it up to the parent via onSelect — the parent then renders
- * the BatchDetail with that report.
+ * Recent batches list — MUI-styled. Each row is an actionable card-row
+ * with the document count, cost, and severity chips.
  *
- * Why a flat list and not a sidebar tree: at small batch counts
- * (typical: <100 per tenant), a vertical scrollable list is faster to
- * scan than a navigation tree. When tenants start uploading thousands
- * of batches we'll add a search + date filter + pagination — but
- * that's a Wave 3.x polish item, not blocking the cockpit's usability.
+ * Accessibility:
+ *   - Each row is a real <button> so keyboard users tab through and
+ *     Enter / Space activates the row.
+ *   - The selected row has aria-selected="true" so SR users hear the
+ *     state change.
+ *   - Loading skeletons preserve the layout footprint (no CLS).
  */
 export function RecentBatches({
   selectedId,
@@ -30,76 +30,75 @@ export function RecentBatches({
   const q = useQuery({
     queryKey: ["recent-batches"],
     queryFn: () => api.listBatches(20),
-    // The list could be refetched on focus to catch batches finished
-    // in other tabs, but that's also covered by manual refresh after
-    // an upload completes (parent invalidates the cache).
   });
 
   if (q.isLoading) {
     return (
       <Card>
-        <CardHeader>
-          <CardTitle>Recent batches</CardTitle>
-        </CardHeader>
-        <CardBody className="p-0"><SkeletonRows rows={3} /></CardBody>
+        <CardContent>
+          <Typography variant="h3" sx={{ mb: 1 }}>Recent batches</Typography>
+          <Stack spacing={1.5}>
+            {Array.from({ length: 3 }).map((_, i) => (
+              <Stack key={i} direction="row" spacing={2} alignItems="center">
+                <Skeleton variant="circular" width={32} height={32} />
+                <Box sx={{ flex: 1 }}>
+                  <Skeleton width="70%" />
+                  <Skeleton width="40%" />
+                </Box>
+              </Stack>
+            ))}
+          </Stack>
+        </CardContent>
       </Card>
     );
   }
+
   if (q.isError) {
     const msg = (q.error as Error).message;
-    // 401 here usually means the user signed in with neither a tenant
-    // API key nor an admin key. Don't shout — explain.
     const is401 = /\b401\b/.test(msg);
     if (is401) {
       return (
         <Card>
-          <CardBody>
-            <EmptyState
-              icon={<FileStack className="h-8 w-8" />}
-              title="Sign in to see your batches"
-              subtitle={
-                "Provide a tenant API key on the sign-in page to see this " +
-                "tenant's batches, OR an admin key to see batches across all " +
-                "tenants. (You can create a tenant + key from Admin → Tenants.)"
-              }
-            />
-          </CardBody>
+          <CardContent sx={{ textAlign: "center", py: 6 }}>
+            <FileStack size={28} style={{ opacity: 0.3, marginBottom: 12 }} />
+            <Typography variant="h4">Sign in to see your batches</Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mt: 1, maxWidth: 460, mx: "auto" }}>
+              Provide a tenant API key on the sign-in page to see this tenant&apos;s
+              batches, OR an admin key to see batches across all tenants. (You can
+              create a tenant + key from Admin → Tenants.)
+            </Typography>
+          </CardContent>
         </Card>
       );
     }
     return (
-      <Card>
-        <CardBody className="flex items-start gap-2 text-sm text-red-600 dark:text-red-400">
-          <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
-          <div>
-            <div className="font-medium">Couldn&apos;t load recent batches.</div>
-            <div className="mt-0.5 text-xs">{msg}</div>
-          </div>
-        </CardBody>
-      </Card>
+      <Alert severity="error" icon={<AlertCircle size={18} />}>
+        <Typography variant="body2" sx={{ fontWeight: 600 }}>Couldn&apos;t load recent batches.</Typography>
+        <Typography variant="caption">{msg}</Typography>
+      </Alert>
     );
   }
+
   const batches = q.data?.batches || [];
   const authMode = q.data?.auth_mode;
+
   if (batches.length === 0) {
     return (
-      <Card><CardBody>
-        <EmptyState
-          icon={<FileStack className="h-8 w-8" />}
-          title="No batches yet"
-          subtitle="Upload some documents above. Past batches will appear here once they finish processing."
-        />
-      </CardBody></Card>
+      <Card>
+        <CardContent sx={{ textAlign: "center", py: 6 }}>
+          <FileStack size={28} style={{ opacity: 0.3, marginBottom: 12 }} />
+          <Typography variant="h4">No batches yet</Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+            Upload some documents above. Past batches will appear here once they finish processing.
+          </Typography>
+        </CardContent>
+      </Card>
     );
   }
 
   const loadAndSelect = async (b: BatchSummary) => {
-    // Use the React Query cache so repeat-clicks are instant.
     const cached = queryClient.getQueryData<BatchReport>(["report", b.id]);
-    if (cached) {
-      onSelect(cached, b);
-      return;
-    }
+    if (cached) { onSelect(cached, b); return; }
     const fetched = await queryClient.fetchQuery<BatchReport>({
       queryKey: ["report", b.id],
       queryFn: () => api.getReport(b.id),
@@ -109,98 +108,114 @@ export function RecentBatches({
 
   return (
     <Card>
-      <CardHeader>
-        <div className="flex items-center justify-between">
-          <div>
-            <CardTitle>Recent batches</CardTitle>
-            <CardDescription>
-              {authMode === "admin"
-                ? "Admin view — listing batches across all tenants. Click any row to load it."
-                : "Click a batch to load its results below."}
-            </CardDescription>
-          </div>
-          <div className="flex items-center gap-2">
-            {authMode === "admin" && <Badge tone="brand">admin view</Badge>}
-            <Badge tone="neutral">{batches.length}</Badge>
-          </div>
-        </div>
-      </CardHeader>
-      <CardBody className="p-0">
-        <ul className="divide-y divide-[rgb(var(--border))]">
+      <CardContent sx={{ p: 0 }}>
+        <Box sx={{ p: 3, pb: 2 }}>
+          <Stack direction="row" alignItems="center" justifyContent="space-between">
+            <Box>
+              <Typography variant="h3">Recent batches</Typography>
+              <Typography variant="body2" color="text.secondary" sx={{ mt: 0.25 }}>
+                {authMode === "admin"
+                  ? "Admin view — across all tenants. Click any row to load."
+                  : "Click a batch to load its results below."}
+              </Typography>
+            </Box>
+            <Stack direction="row" spacing={1}>
+              {authMode === "admin" && <Chip label="admin view" color="primary" size="small" variant="outlined" />}
+              <Chip label={batches.length} size="small" variant="outlined" />
+            </Stack>
+          </Stack>
+        </Box>
+        <Box component="ul" role="listbox" aria-label="Recent batches" sx={{ listStyle: "none", m: 0, p: 0 }}>
           {batches.map((b) => {
             const active = b.id === selectedId;
             return (
-              <li key={b.id}>
-                <button
+              <Box
+                key={b.id}
+                component="li"
+                role="option"
+                aria-selected={active}
+                sx={{ borderTop: 1, borderColor: "divider" }}
+              >
+                <Box
+                  component="button"
                   onClick={() => loadAndSelect(b)}
-                  className={cn(
-                    "w-full text-left px-5 py-3.5 transition-colors flex gap-3",
-                    "hover:bg-[rgb(var(--surface-muted))]",
-                    active && "bg-brand-50 dark:bg-brand-900/30",
-                  )}
+                  sx={{
+                    width: "100%",
+                    textAlign: "left",
+                    border: 0,
+                    bgcolor: active
+                      ? (t) => t.palette.mode === "dark" ? "rgba(99,102,241,.12)" : "rgba(99,102,241,.06)"
+                      : "transparent",
+                    cursor: "pointer",
+                    p: 2.5,
+                    transition: "background-color .12s",
+                    "&:hover": { bgcolor: "action.hover" },
+                  }}
                 >
-                  <div className="shrink-0 mt-0.5">
-                    <FileStack className={cn(
-                      "h-4 w-4",
-                      active ? "text-brand-600 dark:text-brand-300" : "text-[rgb(var(--fg-muted))]",
-                    )} />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-baseline justify-between gap-2">
-                      <span className="font-mono text-xs truncate">
-                        {b.id.slice(0, 8)}…
-                        {authMode === "admin" && b.tenant_id && (
-                          <span className="ml-2 text-[rgb(var(--fg-muted))]">
-                            · tenant {b.tenant_id.slice(0, 8)}
-                          </span>
+                  <Stack direction="row" spacing={2} alignItems="flex-start">
+                    <Box sx={{ pt: 0.5 }}>
+                      <FileStack size={18} color={active ? "var(--mui-palette-primary-main)" : undefined} />
+                    </Box>
+                    <Box sx={{ flex: 1, minWidth: 0 }}>
+                      <Stack direction="row" justifyContent="space-between" alignItems="baseline" sx={{ gap: 1, mb: 0.25 }}>
+                        <Typography variant="caption" sx={{ fontFamily: "monospace" }}>
+                          {b.id.slice(0, 8)}…
+                          {authMode === "admin" && b.tenant_id && (
+                            <Typography component="span" variant="caption" color="text.secondary" sx={{ ml: 1 }}>
+                              · tenant {b.tenant_id.slice(0, 8)}
+                            </Typography>
+                          )}
+                        </Typography>
+                        <Typography variant="caption" color="text.secondary" sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
+                          <Clock size={12} />
+                          {formatRelative(b.started_at)}
+                        </Typography>
+                      </Stack>
+                      {b.narrator_preview && (
+                        <Typography
+                          variant="body2"
+                          sx={{
+                            mt: 0.5,
+                            display: "-webkit-box",
+                            WebkitLineClamp: 2,
+                            WebkitBoxOrient: "vertical",
+                            overflow: "hidden",
+                          }}
+                        >
+                          {b.narrator_preview}
+                        </Typography>
+                      )}
+                      <Stack direction="row" spacing={1.5} alignItems="center" sx={{ mt: 1 }}>
+                        <Typography variant="caption" color="text.secondary">
+                          {b.total_documents} doc{b.total_documents === 1 ? "" : "s"}
+                        </Typography>
+                        <Typography variant="caption" color="text.secondary">·</Typography>
+                        <Typography variant="caption" color="text.secondary">${b.cost_usd.toFixed(4)}</Typography>
+                        {b.anomaly_count > 0 && (
+                          <Chip size="small" color="error" label={`${b.anomaly_count} anomal${b.anomaly_count === 1 ? "y" : "ies"}`} sx={{ height: 18, fontSize: "0.65rem" }} />
                         )}
-                      </span>
-                      <span className="text-xs text-[rgb(var(--fg-muted))] flex items-center gap-1 shrink-0">
-                        <Clock className="h-3 w-3" />
-                        {formatRelative(b.started_at)}
-                      </span>
-                    </div>
-                    {b.narrator_preview && (
-                      <div className="mt-1 text-sm text-[rgb(var(--fg))] line-clamp-2">
-                        {b.narrator_preview}
-                      </div>
-                    )}
-                    <div className="mt-1.5 flex items-center gap-2 text-xs text-[rgb(var(--fg-muted))]">
-                      <span>{b.total_documents} doc{b.total_documents === 1 ? "" : "s"}</span>
-                      <span aria-hidden>·</span>
-                      <span>${b.cost_usd.toFixed(4)}</span>
-                      {b.anomaly_count > 0 && (
-                        <>
-                          <span aria-hidden>·</span>
-                          <Badge tone="danger" className="text-[10px] py-0">
-                            {b.anomaly_count} anomal{b.anomaly_count === 1 ? "y" : "ies"}
-                          </Badge>
-                        </>
-                      )}
-                      {b.insight_count > 0 && (
-                        <>
-                          <span aria-hidden>·</span>
-                          <Badge tone="info" className="text-[10px] py-0 flex items-center gap-1">
-                            <Sparkles className="h-3 w-3" />
-                            {b.insight_count}
-                          </Badge>
-                        </>
-                      )}
-                    </div>
-                  </div>
-                </button>
-              </li>
+                        {b.insight_count > 0 && (
+                          <Chip
+                            size="small"
+                            color="info"
+                            icon={<Sparkles size={10} />}
+                            label={b.insight_count}
+                            sx={{ height: 18, fontSize: "0.65rem", "& .MuiChip-icon": { ml: 0.5 } }}
+                          />
+                        )}
+                      </Stack>
+                    </Box>
+                  </Stack>
+                </Box>
+              </Box>
             );
           })}
-        </ul>
-      </CardBody>
+        </Box>
+      </CardContent>
     </Card>
   );
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Helpers
-// ─────────────────────────────────────────────────────────────────────────────
 function formatRelative(iso: string | null): string {
   if (!iso) return "—";
   const then = new Date(iso).getTime();

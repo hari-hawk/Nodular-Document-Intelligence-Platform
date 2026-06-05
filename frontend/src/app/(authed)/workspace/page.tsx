@@ -1,34 +1,40 @@
 "use client";
 
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { AlertCircle, CheckCircle, ChevronDown, ChevronRight, FileText, UploadCloud } from "lucide-react";
+import {
+  Alert, Box, Button, Card, CardContent, Chip, Divider,
+  IconButton, LinearProgress, Stack, Typography,
+} from "@mui/material";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  AlertCircle, CheckCircle2, ChevronDown, ChevronRight,
+  FileText, FileStack, Sparkles, UploadCloud, X,
+} from "lucide-react";
 import { useState } from "react";
 
-import { api, BatchReport } from "@/lib/api";
-import { cn } from "@/lib/cn";
+import { api, type BatchReport } from "@/lib/api";
 import { FieldRow, fieldValueAsString } from "@/components/field-row";
+import { KpiTile } from "@/components/kpi-tile";
 import { RecentBatches } from "@/components/recent-batches";
-import {
-  Badge, Button, Card, CardBody, CardDescription, CardHeader, CardTitle,
-  EmptyState, Spinner,
-} from "@/components/ui";
 
 /**
- * Workspace — the daily-use cockpit. Single page, three stacked sections:
+ * Workspace — the daily-use cockpit.
  *
- *   1. Upload zone (drag-drop or file picker)
- *   2. Selected batch — appears after upload completes, with three
- *      collapsible inner sections: Results / Insights / Corrections
+ * Polish pass (MUI):
+ *   - KPI hero strip with 4 stat tiles (Docs · Insights · Anomalies · Cost)
+ *     so analysts get an at-a-glance read on the current batch without
+ *     scrolling.
+ *   - Gradient-bordered upload zone with a Material drop-target feel.
+ *   - Recent batches gets surfaced UNDER the upload so the "I just
+ *     uploaded — now what" flow stays top-to-bottom.
+ *   - Each batch detail section uses MUI's expansion-pattern via
+ *     <Section>: chevron + tone-aware Chip count + smooth expand.
  *
- * No tabs at the page level: scrolling top-to-bottom matches the
- * natural workflow ("I uploaded — now what came out — now what do I do
- * about it"). Tabs would force a context switch for a single linear
- * task.
- *
- * Recent-batches history would also live here long-term (between
- * upload and results) but listing /report needs a separate endpoint
- * that doesn't exist yet — when it does, drop it in between the
- * Upload card and the Selected-batch detail without restructuring.
+ * Accessibility:
+ *   - File picker is a real <input type="file"> wrapped in <label>,
+ *     so screen-reader users hit it via "Browse" link text.
+ *   - Drop zone has aria-describedby pointing at the file-type hint.
+ *   - Section headers are <button> with aria-expanded so SR users
+ *     understand the collapsible region.
  */
 export default function WorkspacePage() {
   const queryClient = useQueryClient();
@@ -36,13 +42,17 @@ export default function WorkspacePage() {
   const [report, setReport] = useState<BatchReport | null>(null);
   const [selectedBatchId, setSelectedBatchId] = useState<string | null>(null);
 
+  // Tenant-scoped current usage (for the Cost-this-month KPI).
+  const usageQ = useQuery({
+    queryKey: ["tenant-usage"],
+    queryFn: () => api.getTenantUsage(),
+    retry: 0,  // 401s when admin-only signed in are fine, leave silently
+  });
+
   const upload = useMutation({
     mutationFn: (toUpload: File[]) => api.processBatch(toUpload),
     onSuccess: (r) => {
       setReport(r);
-      // The upload just produced a new batch; refresh the list so the
-      // user sees it appear at the top without a manual reload. The
-      // batch_id comes back inside the report (set by the orchestrator).
       setSelectedBatchId(r.batch_id ?? null);
       setFiles([]);
       queryClient.invalidateQueries({ queryKey: ["recent-batches"] });
@@ -63,100 +73,164 @@ export default function WorkspacePage() {
   const removeFile = (i: number) =>
     setFiles((prev) => prev.filter((_, idx) => idx !== i));
 
-  return (
-    <div className="space-y-6">
-      <header>
-        <h1 className="text-2xl font-semibold tracking-tight">Workspace</h1>
-        <p className="text-sm text-[rgb(var(--fg-muted))] mt-1">
-          Upload documents, watch them get extracted, review what came out.
-        </p>
-      </header>
+  // KPI inputs — pull from the current report when present, fall back to "—".
+  const docCount = report?.documents.length ?? 0;
+  const insightCount = report?.insights?.length ?? 0;
+  const anomalyCount = report?.anomalies?.length ?? 0;
+  const cost = report?.total_cost_usd ?? 0;
+  const monthlyCap = usageQ.data?.monthly_cap_usd ?? 0;
+  const monthlySpent = usageQ.data?.spent_usd ?? 0;
 
-      {/* ───────────── Upload section ───────────── */}
+  return (
+    <Stack spacing={4}>
+      {/* ─── Hero / page heading ─── */}
+      <Box>
+        <Typography variant="h1" sx={{ fontWeight: 700 }}>Workspace</Typography>
+        <Typography color="text.secondary" sx={{ mt: 0.5 }}>
+          Upload documents, watch them get extracted, review what came out.
+        </Typography>
+      </Box>
+
+      {/* ─── KPI strip ─── */}
+      <Box
+        sx={{
+          display: "grid",
+          gap: 2,
+          gridTemplateColumns: { xs: "1fr", sm: "repeat(2, 1fr)", md: "repeat(4, 1fr)" },
+        }}
+      >
+        <KpiTile
+          label="Documents in batch"
+          value={report ? docCount : "—"}
+          caption={report ? `${docCount} processed` : "Upload to begin"}
+          icon={<FileStack size={18} />}
+        />
+        <KpiTile
+          label="Insights"
+          value={report ? insightCount : "—"}
+          caption={insightCount ? "needs review" : "none yet"}
+          tone={insightCount ? "info" : "default"}
+          icon={<Sparkles size={18} />}
+        />
+        <KpiTile
+          label="Anomalies"
+          value={report ? anomalyCount : "—"}
+          caption={anomalyCount ? "flagged" : "all clear"}
+          tone={anomalyCount ? "danger" : "success"}
+          icon={anomalyCount ? <AlertCircle size={18} /> : <CheckCircle2 size={18} />}
+        />
+        <KpiTile
+          label="Spend this month"
+          value={monthlyCap ? `$${monthlySpent.toFixed(2)}` : `$${cost.toFixed(4)}`}
+          caption={monthlyCap ? `of $${monthlyCap.toFixed(0)} cap` : "this batch"}
+          tone="default"
+        />
+      </Box>
+
+      {/* ─── Upload zone ─── */}
       <Card>
-        <CardHeader>
-          <CardTitle>Upload documents</CardTitle>
-          <CardDescription>
-            PDF, image, or text. Up to 200 pages per file (the soft cap warns
-            at 10).
-          </CardDescription>
-        </CardHeader>
-        <CardBody>
-          <div
+        <CardContent sx={{ p: { xs: 2, md: 3 } }}>
+          <Stack direction="row" alignItems="baseline" justifyContent="space-between" sx={{ mb: 2 }}>
+            <Box>
+              <Typography variant="h3">Upload documents</Typography>
+              <Typography variant="body2" color="text.secondary" id="upload-hint">
+                PDF, image, or text. Up to 200 pages per file (the soft cap warns at 10).
+              </Typography>
+            </Box>
+          </Stack>
+
+          <Box
             onDragOver={(e) => e.preventDefault()}
             onDrop={onDrop}
-            className={cn(
-              "rounded-md border-2 border-dashed p-8 text-center",
-              "border-[rgb(var(--border))] bg-[rgb(var(--surface-muted))]",
-              "transition-colors hover:bg-slate-100 dark:hover:bg-slate-800",
-            )}
+            aria-describedby="upload-hint"
+            sx={{
+              borderRadius: 3,
+              border: "2px dashed",
+              borderColor: "divider",
+              bgcolor: (t) => t.palette.mode === "dark"
+                ? "rgba(99,102,241,.04)" : "rgba(99,102,241,.04)",
+              p: { xs: 4, md: 6 },
+              textAlign: "center",
+              transition: "border-color .2s, background-color .2s",
+              "&:hover": {
+                borderColor: "primary.main",
+                bgcolor: (t) => t.palette.mode === "dark"
+                  ? "rgba(99,102,241,.08)" : "rgba(99,102,241,.08)",
+              },
+            }}
           >
-            <UploadCloud className="h-8 w-8 mx-auto text-brand-500" />
-            <p className="mt-2 text-sm font-medium">
+            <Box sx={{ display: "inline-flex", p: 2, mb: 1.5, borderRadius: "50%", bgcolor: "primary.main", color: "primary.contrastText" }}>
+              <UploadCloud size={28} />
+            </Box>
+            <Typography sx={{ fontWeight: 600, mb: 0.5 }}>
               Drag files here, or{" "}
-              <label className="text-brand-600 dark:text-brand-400 cursor-pointer underline">
+              <Box
+                component="label"
+                sx={{ color: "primary.main", cursor: "pointer", textDecoration: "underline" }}
+              >
                 browse
                 <input
                   type="file"
                   multiple
-                  className="hidden"
+                  hidden
                   onChange={onPick}
                   accept=".pdf,.png,.jpg,.jpeg,.tiff,.txt"
+                  aria-label="Pick files to upload"
                 />
-              </label>
-            </p>
-            <p className="text-xs text-[rgb(var(--fg-muted))] mt-1">
-              Multiple files OK. They're processed concurrently.
-            </p>
-          </div>
+              </Box>
+            </Typography>
+            <Typography variant="caption" color="text.secondary">
+              Multiple files OK. They&apos;re processed concurrently.
+            </Typography>
+          </Box>
 
           {files.length > 0 && (
-            <div className="mt-4 space-y-2">
+            <Stack spacing={1.5} sx={{ mt: 3 }}>
               {files.map((f, i) => (
-                <div
-                  key={i}
-                  className="flex items-center gap-3 text-sm border border-[rgb(var(--border))] rounded-md p-2.5"
-                >
-                  <FileText className="h-4 w-4 text-[rgb(var(--fg-muted))] shrink-0" />
-                  <div className="flex-1 min-w-0">
-                    <div className="font-medium truncate">{f.name}</div>
-                    <div className="text-xs text-[rgb(var(--fg-muted))]">
-                      {(f.size / 1024).toFixed(1)} KB · {f.type || "unknown"}
-                    </div>
-                  </div>
-                  <Button variant="ghost" size="sm" onClick={() => removeFile(i)}>
-                    Remove
-                  </Button>
-                </div>
+                <Card key={i} variant="outlined" sx={{ p: 1.5 }}>
+                  <Stack direction="row" spacing={1.5} alignItems="center">
+                    <FileText size={18} style={{ flexShrink: 0, opacity: 0.6 }} />
+                    <Box sx={{ flex: 1, minWidth: 0 }}>
+                      <Typography variant="body2" sx={{ fontWeight: 500 }} noWrap>
+                        {f.name}
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        {(f.size / 1024).toFixed(1)} KB · {f.type || "unknown"}
+                      </Typography>
+                    </Box>
+                    <IconButton size="small" onClick={() => removeFile(i)} aria-label={`Remove ${f.name}`}>
+                      <X size={16} />
+                    </IconButton>
+                  </Stack>
+                </Card>
               ))}
-
-              <div className="pt-2 flex items-center justify-between">
-                <div className="text-sm text-[rgb(var(--fg-muted))]">
+              <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ pt: 1 }}>
+                <Typography variant="body2" color="text.secondary">
                   {files.length} file{files.length === 1 ? "" : "s"} queued
-                </div>
+                </Typography>
                 <Button
+                  variant="contained"
+                  size="large"
                   onClick={() => upload.mutate(files)}
                   disabled={upload.isPending}
                 >
-                  {upload.isPending ? <><Spinner className="border-white border-t-transparent" /> Processing…</> : "Process"}
+                  {upload.isPending ? "Processing…" : "Process"}
                 </Button>
-              </div>
-            </div>
+              </Stack>
+              {upload.isPending && <LinearProgress />}
+            </Stack>
           )}
 
           {upload.isError && (
-            <div className="mt-4 rounded-md border border-red-300 bg-red-50 dark:bg-red-900/20 p-3 text-sm text-red-700 dark:text-red-300 flex gap-2 items-start">
-              <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
-              <div>
-                <div className="font-medium">Processing failed</div>
-                <div className="mt-0.5">{(upload.error as Error)?.message}</div>
-              </div>
-            </div>
+            <Alert severity="error" icon={<AlertCircle size={18} />} sx={{ mt: 2 }}>
+              <Typography variant="body2" sx={{ fontWeight: 600 }}>Processing failed</Typography>
+              <Typography variant="body2">{(upload.error as Error)?.message}</Typography>
+            </Alert>
           )}
-        </CardBody>
+        </CardContent>
       </Card>
 
-      {/* ───────────── Recent batches ───────────── */}
+      {/* ─── Recent batches ─── */}
       <RecentBatches
         selectedId={selectedBatchId}
         onSelect={(r, summary) => {
@@ -165,91 +239,95 @@ export default function WorkspacePage() {
         }}
       />
 
-      {/* ───────────── Batch detail ───────────── */}
+      {/* ─── Batch detail (stacked sections) ─── */}
       {report ? (
         <BatchDetail report={report} />
       ) : (
         <Card>
-          <CardBody>
-            <EmptyState
-              icon={<FileText className="h-8 w-8" />}
-              title="No batch selected"
-              subtitle="Upload above or pick one from the list to see its results."
-            />
-          </CardBody>
+          <CardContent sx={{ textAlign: "center", py: 6 }}>
+            <FileText size={32} style={{ opacity: 0.3, marginBottom: 12 }} />
+            <Typography variant="h4">No batch selected</Typography>
+            <Typography color="text.secondary" sx={{ mt: 1 }}>
+              Upload above or pick one from the list to see its results.
+            </Typography>
+          </CardContent>
         </Card>
       )}
-    </div>
+    </Stack>
   );
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// BatchDetail — collapsible Results / Insights / Corrections.
+// BatchDetail — collapsible Results / Insights / Corrections
 // ─────────────────────────────────────────────────────────────────────────────
 type Section = "results" | "insights" | "corrections" | null;
 
 function BatchDetail({ report }: { report: BatchReport }) {
-  // Default open: Results (most-asked first). Mobile-friendly accordion
-  // lets analysts collapse what they don't need.
   const [openSection, setOpenSection] = useState<Section>("results");
-
   const docCount = report.documents.length;
   const insightCount = report.insights?.length || 0;
   const anomalyCount = report.anomalies?.length || 0;
 
   return (
     <Card>
-      <CardHeader>
-        <div className="flex items-center justify-between">
-          <div>
-            <CardTitle>Selected batch</CardTitle>
-            <CardDescription>
-              {docCount} document{docCount === 1 ? "" : "s"} processed in{" "}
-              {durationSince(report.started_at, report.finished_at)} ·{" "}
-              cost ${report.total_cost_usd.toFixed(4)}
-            </CardDescription>
-          </div>
-          <div className="flex gap-2">
-            <Badge tone={anomalyCount ? "danger" : "neutral"}>
-              {anomalyCount} anomal{anomalyCount === 1 ? "y" : "ies"}
-            </Badge>
-            <Badge tone={insightCount ? "info" : "neutral"}>
-              {insightCount} insight{insightCount === 1 ? "" : "s"}
-            </Badge>
-          </div>
-        </div>
-      </CardHeader>
+      <CardContent sx={{ p: 0 }}>
+        {/* Header */}
+        <Box sx={{ p: 3, borderBottom: 1, borderColor: "divider" }}>
+          <Stack direction={{ xs: "column", sm: "row" }} alignItems={{ sm: "center" }} justifyContent="space-between" spacing={2}>
+            <Box>
+              <Typography variant="h3">Selected batch</Typography>
+              <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+                {docCount} document{docCount === 1 ? "" : "s"} processed in{" "}
+                {durationSince(report.started_at, report.finished_at)} ·{" "}
+                cost ${report.total_cost_usd.toFixed(4)}
+              </Typography>
+            </Box>
+            <Stack direction="row" spacing={1}>
+              <Chip
+                size="small"
+                color={anomalyCount ? "error" : "default"}
+                variant={anomalyCount ? "filled" : "outlined"}
+                label={`${anomalyCount} anomal${anomalyCount === 1 ? "y" : "ies"}`}
+              />
+              <Chip
+                size="small"
+                color={insightCount ? "info" : "default"}
+                variant={insightCount ? "filled" : "outlined"}
+                label={`${insightCount} insight${insightCount === 1 ? "" : "s"}`}
+              />
+            </Stack>
+          </Stack>
+        </Box>
 
-      <CardBody className="p-0">
-        <Section
+        <ExpandSection
           label="Results — what was extracted"
           isOpen={openSection === "results"}
           onToggle={() => setOpenSection(openSection === "results" ? null : "results")}
           badge={`${docCount} docs`}
         >
           <ResultsSection report={report} />
-        </Section>
-        <Section
+        </ExpandSection>
+        <ExpandSection
           label="Insights & anomalies"
           isOpen={openSection === "insights"}
           onToggle={() => setOpenSection(openSection === "insights" ? null : "insights")}
           badge={`${insightCount + anomalyCount}`}
         >
           <InsightsSection report={report} />
-        </Section>
-        <Section
+        </ExpandSection>
+        <ExpandSection
           label="Review & corrections"
           isOpen={openSection === "corrections"}
           onToggle={() => setOpenSection(openSection === "corrections" ? null : "corrections")}
         >
           <CorrectionsSection report={report} />
-        </Section>
-      </CardBody>
+        </ExpandSection>
+      </CardContent>
     </Card>
   );
 }
 
-function Section({
+function ExpandSection({
   label, isOpen, onToggle, badge, children,
 }: {
   label: string;
@@ -259,44 +337,59 @@ function Section({
   children: React.ReactNode;
 }) {
   return (
-    <div className="border-t border-[rgb(var(--border))] first:border-t-0">
-      <button
+    <Box sx={{ borderTop: 1, borderColor: "divider", "&:first-of-type": { borderTop: 0 } }}>
+      <Box
+        component="button"
         onClick={onToggle}
-        className="w-full flex items-center gap-2 px-5 py-3.5 text-left text-sm font-medium hover:bg-[rgb(var(--surface-muted))]"
+        aria-expanded={isOpen}
+        sx={{
+          width: "100%",
+          display: "flex",
+          alignItems: "center",
+          gap: 1.5,
+          px: 3, py: 2,
+          textAlign: "left",
+          border: 0,
+          background: "transparent",
+          cursor: "pointer",
+          color: "text.primary",
+          fontSize: "0.9375rem",
+          fontWeight: 500,
+          "&:hover": { bgcolor: "action.hover" },
+        }}
       >
-        {isOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-        <span className="flex-1">{label}</span>
+        {isOpen ? <ChevronDown size={18} /> : <ChevronRight size={18} />}
+        <Typography sx={{ flex: 1, fontWeight: 500 }}>{label}</Typography>
         {badge !== undefined && (
-          <Badge tone="neutral">{badge}</Badge>
+          <Chip size="small" label={badge} variant="outlined" />
         )}
-      </button>
-      {isOpen && <div className="px-5 pb-5">{children}</div>}
-    </div>
+      </Box>
+      {isOpen && <Box sx={{ px: 3, pb: 3 }}>{children}</Box>}
+    </Box>
   );
 }
 
 function ResultsSection({ report }: { report: BatchReport }) {
   if (report.documents.length === 0) {
-    return <EmptyState title="No documents in this batch" />;
+    return <Typography variant="body2" color="text.secondary">No documents in this batch.</Typography>;
   }
   return (
-    <div className="space-y-3">
+    <Stack spacing={2}>
       {report.documents.map((doc) => {
         const cluster = report.clusters[doc.document_id];
         const fields = report.extractions[doc.document_id]?.fields || {};
         const entries = Object.entries(fields);
         return (
-          <div key={doc.document_id} className="border border-[rgb(var(--border))] rounded-md p-4">
-            <div className="flex items-baseline justify-between mb-2">
-              <h4 className="font-medium">{doc.filename}</h4>
+          <Card key={doc.document_id} variant="outlined" sx={{ p: 2 }}>
+            <Stack direction="row" alignItems="baseline" justifyContent="space-between" sx={{ mb: 1.5 }}>
+              <Typography variant="body1" sx={{ fontWeight: 600 }}>{doc.filename}</Typography>
               {cluster && (
-                <div className="text-xs text-[rgb(var(--fg-muted))]">
-                  {cluster.industry} · {cluster.vendor} · {cluster.doc_type} ·{" "}
-                  conf {(cluster.confidence * 100).toFixed(0)}%
-                </div>
+                <Typography variant="caption" color="text.secondary">
+                  {cluster.industry} · {cluster.vendor} · {cluster.doc_type} · conf {(cluster.confidence * 100).toFixed(0)}%
+                </Typography>
               )}
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1 text-sm">
+            </Stack>
+            <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" }, columnGap: 3, rowGap: 0.5 }}>
               {entries.map(([k, v]) => (
                 <FieldRow
                   key={k}
@@ -309,13 +402,13 @@ function ResultsSection({ report }: { report: BatchReport }) {
                 />
               ))}
               {entries.length === 0 && (
-                <span className="text-xs text-[rgb(var(--fg-muted))]">No fields extracted.</span>
+                <Typography variant="caption" color="text.secondary">No fields extracted.</Typography>
               )}
-            </div>
-          </div>
+            </Box>
+          </Card>
         );
       })}
-    </div>
+    </Stack>
   );
 }
 
@@ -331,70 +424,74 @@ function InsightsSection({ report }: { report: BatchReport }) {
     })),
   ];
   if (all.length === 0) {
-    return <EmptyState icon={<CheckCircle className="h-6 w-6" />} title="Nothing flagged." subtitle="No insights and no anomalies on this batch." />;
+    return (
+      <Stack alignItems="center" sx={{ py: 4 }}>
+        <CheckCircle2 size={24} style={{ opacity: 0.5 }} />
+        <Typography variant="body2" sx={{ mt: 1, fontWeight: 500 }}>Nothing flagged</Typography>
+        <Typography variant="caption" color="text.secondary">No insights and no anomalies on this batch.</Typography>
+      </Stack>
+    );
   }
   return (
-    <div className="space-y-2">
+    <Stack spacing={1.5}>
       {all.map((f, i) => (
-        <div key={i} className="border border-[rgb(var(--border))] rounded-md p-3">
-          <div className="flex items-center gap-2 mb-1">
-            <SeverityBadge severity={f.severity} />
-            <span className="text-xs text-[rgb(var(--fg-muted))]">{f.insight_type}</span>
-          </div>
-          <div className="text-sm font-medium">{f.title}</div>
+        <Card key={i} variant="outlined" sx={{ p: 2 }}>
+          <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 1 }}>
+            <Chip
+              size="small"
+              label={f.severity}
+              color={f.severity === "HIGH" ? "error" : f.severity === "MEDIUM" ? "warning" : "info"}
+            />
+            <Typography variant="caption" color="text.secondary">{f.insight_type}</Typography>
+          </Stack>
+          <Typography variant="body2" sx={{ fontWeight: 500 }}>{f.title}</Typography>
           {f.body && (
-            <div className="text-sm text-[rgb(var(--fg-muted))] mt-1 whitespace-pre-wrap">
+            <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5, whiteSpace: "pre-wrap" }}>
               {f.body}
-            </div>
+            </Typography>
           )}
-        </div>
+        </Card>
       ))}
-    </div>
+    </Stack>
   );
 }
 
 function CorrectionsSection({ report }: { report: BatchReport }) {
   return (
-    <div className="space-y-3 text-sm">
-      <div className="text-[rgb(var(--fg-muted))]">
-        Click any field in the Results section above to correct it. Corrections
-        embed into the brain immediately and bias future similar documents.
-      </div>
-      <div className="text-xs text-[rgb(var(--fg-muted))]">
-        Pending Wave 3.x: inline-edit affordance + a queue view of recent
-        analyst corrections. For now, use POST /correction directly.
-      </div>
+    <Stack spacing={2}>
+      <Typography variant="body2" color="text.secondary">
+        Hover any field in the Results section above to reveal a pencil icon. Corrections embed into the
+        brain immediately and bias future similar documents.
+      </Typography>
       {report.pattern_matches && report.pattern_matches.length > 0 && (
-        <div className="mt-3 border border-[rgb(var(--border))] rounded-md p-3">
-          <div className="text-xs font-medium mb-2">Pattern matches</div>
-          <div className="space-y-1">
+        <Card variant="outlined" sx={{ p: 2 }}>
+          <Typography variant="caption" sx={{ fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" }}>
+            Pattern matches
+          </Typography>
+          <Stack spacing={0.5} sx={{ mt: 1.5 }}>
             {report.pattern_matches.slice(0, 10).map((m, i) => (
-              <div key={i} className="flex gap-3 text-xs">
-                <span className="font-mono text-[rgb(var(--fg-muted))]">#{m.rank}</span>
-                <span className="font-mono">{m.pattern_id.slice(0, 8)}</span>
-                <span className="text-[rgb(var(--fg-muted))]">
+              <Stack key={i} direction="row" spacing={2} sx={{ fontFamily: "monospace", fontSize: "0.75rem" }}>
+                <Typography variant="caption" color="text.secondary">#{m.rank}</Typography>
+                <Typography variant="caption" sx={{ fontFamily: "monospace" }}>{m.pattern_id.slice(0, 8)}</Typography>
+                <Typography variant="caption" color="text.secondary">
                   similarity {(m.similarity * 100).toFixed(0)}%
-                </span>
-              </div>
+                </Typography>
+              </Stack>
             ))}
-          </div>
-        </div>
+          </Stack>
+        </Card>
       )}
-    </div>
+      <Divider />
+      <Typography variant="caption" color="text.secondary">
+        Inline-edit affordance · queue of recent analyst corrections coming in Wave 3.x polish.
+      </Typography>
+    </Stack>
   );
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Helpers
 // ─────────────────────────────────────────────────────────────────────────────
-function SeverityBadge({ severity }: { severity: string }) {
-  const tone =
-    severity === "HIGH" ? "danger" :
-    severity === "MEDIUM" ? "warning" :
-    severity === "LOW" ? "info" : "neutral";
-  return <Badge tone={tone}>{severity}</Badge>;
-}
-
 function formatFieldValue(v: unknown): string {
   if (v == null) return "—";
   if (typeof v === "string") return v;

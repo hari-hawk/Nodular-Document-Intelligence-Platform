@@ -1,24 +1,32 @@
 "use client";
 
-import { Brain, LayoutGrid, MessageSquare, Moon, Settings, Sun } from "lucide-react";
+import {
+  Avatar,
+  Box,
+  Chip,
+  Divider,
+  Drawer,
+  IconButton,
+  List,
+  ListItem,
+  ListItemButton,
+  ListItemIcon,
+  ListItemText,
+  Stack,
+  Toolbar,
+  Tooltip,
+  Typography,
+} from "@mui/material";
+import {
+  Brain, ChevronsLeft, LayoutGrid, LogOut, MessageSquare, Moon, Settings, Sun,
+} from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 
 import { clearAuth, isAuthed } from "@/lib/api";
-import { cn } from "@/lib/cn";
-import { Badge, Button, Logomark } from "./ui";
 import { ChatDrawer } from "./chat-drawer";
 
-/**
- * Three-route shell, plus a chat drawer that slides in from the right
- * edge of any page. The sidebar is intentionally narrow (icons + small
- * labels) — analysts spend most screen time on the page body, not the
- * nav, so we save horizontal real-estate.
- *
- * Auth guard: routes are client-side gated. If localStorage doesn't
- * have an admin key OR an api key set, we bounce back to /.
- */
 const NAV = [
   { href: "/workspace", label: "Workspace", icon: LayoutGrid,
     sub: "Upload · Results · Review" },
@@ -28,13 +36,32 @@ const NAV = [
     sub: "Tenants · Spend · Settings" },
 ] as const;
 
+const DRAWER_WIDTH = 268;
+
+/**
+ * App shell — MUI Drawer-based sidebar that handles every authed route.
+ *
+ * Decisions:
+ *  - PERMANENT drawer at md+, TEMPORARY (slide-in) at mobile. MUI's
+ *    responsive Drawer handles the breakpoint automatically.
+ *  - Sidebar items have a sub-label so analysts know what each tab
+ *    contains before clicking — reduces guess-and-go.
+ *  - Theme toggle, sign-out, and "Ask the brain" all sit at the bottom
+ *    of the sidebar with explicit aria-labels for screen-reader users.
+ *
+ * Accessibility:
+ *  - All icon-only buttons have aria-label.
+ *  - The nav list is in <nav role> via MUI Drawer's `<aside>` semantic
+ *    container.
+ *  - Active route is marked with `aria-current="page"` for SR users.
+ */
 export function AppShell({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
   const [chatOpen, setChatOpen] = useState(false);
   const [theme, setTheme] = useState<"light" | "dark">("light");
+  const [mobileOpen, setMobileOpen] = useState(false);
 
-  // Theme — keep React state in sync with what ThemeBoot put on <html>.
   useEffect(() => {
     setTheme(document.documentElement.classList.contains("dark") ? "dark" : "light");
   }, []);
@@ -46,11 +73,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     setTheme(next);
   }, [theme]);
 
-  // Bounce to login if we ended up here without credentials.
+  // Auth guard.
   useEffect(() => {
-    if (!isAuthed() && pathname !== "/") {
-      router.replace("/");
-    }
+    if (!isAuthed() && pathname !== "/") router.replace("/");
   }, [pathname, router]);
 
   const onSignOut = useCallback(() => {
@@ -58,88 +83,166 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     router.replace("/");
   }, [router]);
 
-  return (
-    <div className="flex h-screen">
-      {/* ── Sidebar ─────────────────────────────────────────────────── */}
-      <aside
-        className={cn(
-          "w-64 shrink-0 border-r border-[rgb(var(--border))]",
-          "bg-[rgb(var(--surface))] flex flex-col",
-        )}
-      >
-        <div className="h-14 flex items-center px-5 border-b border-[rgb(var(--border))]">
-          <Logomark className="mr-2" />
-          <div className="font-semibold tracking-tight">
-            MDI<span className="text-brand-500">.</span>
-          </div>
-          <Badge tone="brand" className="ml-2 text-[10px]">v0.1</Badge>
-        </div>
+  const drawerContent = (
+    <Stack sx={{ height: "100%" }}>
+      {/* Brand header */}
+      <Toolbar sx={{ px: 2.5, gap: 1.5, minHeight: 64 }}>
+        <Avatar
+          variant="rounded"
+          sx={{
+            width: 32, height: 32,
+            background: "linear-gradient(135deg, #6366F1, #4338CA)",
+            fontSize: "0.85rem", fontWeight: 700,
+          }}
+        >
+          M
+        </Avatar>
+        <Box>
+          <Typography variant="body1" sx={{ fontWeight: 700, lineHeight: 1, letterSpacing: "-0.01em" }}>
+            MDI<span style={{ color: "var(--mui-palette-primary-main, #6366F1)" }}>.</span>
+          </Typography>
+          <Typography variant="caption" color="text.secondary" sx={{ display: "block" }}>
+            Document Intelligence
+          </Typography>
+        </Box>
+        <Chip label="v0.1" size="small" color="primary" variant="outlined" sx={{ ml: "auto", height: 20, fontSize: "0.65rem" }} />
+      </Toolbar>
+      <Divider />
 
-        <nav className="flex-1 p-3 space-y-1">
-          {NAV.map((item) => {
-            const Icon = item.icon;
-            const active = pathname?.startsWith(item.href);
-            return (
-              <Link
-                key={item.href}
+      {/* Nav */}
+      <List component="nav" aria-label="Primary navigation" sx={{ flex: 1, px: 1.5, py: 1.5 }}>
+        {NAV.map((item) => {
+          const Icon = item.icon;
+          const active = pathname?.startsWith(item.href);
+          return (
+            <ListItem key={item.href} disablePadding sx={{ mb: 0.5 }}>
+              <ListItemButton
+                component={Link}
                 href={item.href}
-                className={cn(
-                  "flex items-start gap-3 rounded-md px-3 py-2.5 text-sm transition-colors",
-                  active
-                    ? "bg-brand-50 dark:bg-brand-900/30 text-brand-700 dark:text-brand-200"
-                    : "text-[rgb(var(--fg-muted))] hover:bg-[rgb(var(--surface-muted))] hover:text-[rgb(var(--fg))]",
-                )}
+                selected={active}
+                aria-current={active ? "page" : undefined}
+                sx={{
+                  borderRadius: 2,
+                  py: 1.25,
+                  "&.Mui-selected": {
+                    bgcolor: (t) => t.palette.mode === "dark"
+                      ? "rgba(99,102,241,.16)" : "rgba(99,102,241,.10)",
+                    color: "primary.main",
+                    "&:hover": {
+                      bgcolor: (t) => t.palette.mode === "dark"
+                        ? "rgba(99,102,241,.22)" : "rgba(99,102,241,.16)",
+                    },
+                  },
+                }}
               >
-                <Icon className="h-4 w-4 mt-0.5 shrink-0" />
-                <div>
-                  <div className="font-medium">{item.label}</div>
-                  <div className="text-xs text-[rgb(var(--fg-muted))] mt-0.5">
-                    {item.sub}
-                  </div>
-                </div>
-              </Link>
-            );
-          })}
-        </nav>
+                <ListItemIcon sx={{ minWidth: 36, color: "inherit" }}>
+                  <Icon size={18} />
+                </ListItemIcon>
+                <ListItemText
+                  primary={item.label}
+                  secondary={item.sub}
+                  primaryTypographyProps={{ fontWeight: 600, fontSize: "0.875rem" }}
+                  secondaryTypographyProps={{ fontSize: "0.72rem", lineHeight: 1.3 }}
+                />
+              </ListItemButton>
+            </ListItem>
+          );
+        })}
+      </List>
 
-        <div className="p-3 border-t border-[rgb(var(--border))] space-y-2">
-          <Button
-            variant="ghost"
-            size="sm"
-            className="w-full justify-start"
-            onClick={() => setChatOpen(true)}
-          >
-            <MessageSquare className="h-4 w-4" />
-            Ask the brain
-          </Button>
-          <div className="flex gap-2">
-            <Button
-              variant="ghost"
-              size="sm"
-              className="flex-1 justify-center"
+      {/* Footer actions */}
+      <Box sx={{ p: 1.5, borderTop: 1, borderColor: "divider" }}>
+        <ListItemButton
+          onClick={() => setChatOpen(true)}
+          sx={{ borderRadius: 2, mb: 1 }}
+        >
+          <ListItemIcon sx={{ minWidth: 36 }}>
+            <MessageSquare size={18} />
+          </ListItemIcon>
+          <ListItemText
+            primary="Ask the brain"
+            primaryTypographyProps={{ fontSize: "0.875rem", fontWeight: 500 }}
+          />
+        </ListItemButton>
+        <Stack direction="row" spacing={1}>
+          <Tooltip title={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}>
+            <IconButton
               onClick={toggleTheme}
+              size="small"
               aria-label="Toggle theme"
+              sx={{ flex: 1, borderRadius: 2, border: 1, borderColor: "divider" }}
             >
-              {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-            </Button>
-            <Button
-              variant="secondary"
-              size="sm"
-              className="flex-1"
+              {theme === "dark" ? <Sun size={16} /> : <Moon size={16} />}
+            </IconButton>
+          </Tooltip>
+          <Tooltip title="Sign out">
+            <IconButton
               onClick={onSignOut}
+              size="small"
+              aria-label="Sign out"
+              sx={{ flex: 1, borderRadius: 2, border: 1, borderColor: "divider" }}
             >
-              Sign out
-            </Button>
-          </div>
-        </div>
-      </aside>
+              <LogOut size={16} />
+            </IconButton>
+          </Tooltip>
+        </Stack>
+      </Box>
+    </Stack>
+  );
 
-      {/* ── Main ────────────────────────────────────────────────────── */}
-      <main className="flex-1 overflow-y-auto">
-        <div className="max-w-6xl mx-auto px-6 py-8">{children}</div>
-      </main>
+  return (
+    <Box sx={{ display: "flex", minHeight: "100vh", bgcolor: "background.default" }}>
+      {/* Mobile drawer */}
+      <Drawer
+        variant="temporary"
+        open={mobileOpen}
+        onClose={() => setMobileOpen(false)}
+        ModalProps={{ keepMounted: true }}
+        sx={{
+          display: { xs: "block", md: "none" },
+          "& .MuiDrawer-paper": { width: DRAWER_WIDTH, boxSizing: "border-box" },
+        }}
+      >
+        {drawerContent}
+      </Drawer>
+
+      {/* Desktop drawer */}
+      <Drawer
+        variant="permanent"
+        sx={{
+          display: { xs: "none", md: "block" },
+          width: DRAWER_WIDTH,
+          flexShrink: 0,
+          "& .MuiDrawer-paper": { width: DRAWER_WIDTH, boxSizing: "border-box" },
+        }}
+        open
+      >
+        {drawerContent}
+      </Drawer>
+
+      {/* Main */}
+      <Box
+        component="main"
+        sx={{
+          flexGrow: 1,
+          width: { md: `calc(100% - ${DRAWER_WIDTH}px)` },
+          minHeight: "100vh",
+          overflowX: "hidden",
+        }}
+      >
+        {/* Mobile toolbar with menu button */}
+        <Box sx={{ display: { xs: "flex", md: "none" }, alignItems: "center", p: 1.5, borderBottom: 1, borderColor: "divider" }}>
+          <IconButton onClick={() => setMobileOpen(true)} aria-label="Open navigation">
+            <ChevronsLeft size={20} style={{ transform: "rotate(180deg)" }} />
+          </IconButton>
+        </Box>
+
+        <Box sx={{ maxWidth: 1280, mx: "auto", px: { xs: 2, md: 4 }, py: { xs: 3, md: 4 } }}>
+          {children}
+        </Box>
+      </Box>
 
       <ChatDrawer open={chatOpen} onClose={() => setChatOpen(false)} />
-    </div>
+    </Box>
   );
 }
