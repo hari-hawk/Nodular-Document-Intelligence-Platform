@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 
 import { api, type PatternDetail, type PatternSummary } from "@/lib/api";
+import { HandlerRunner } from "@/components/handler-runner";
 import { cn } from "@/lib/cn";
 import {
   Badge, Button, Card, CardBody, CardDescription, CardHeader, CardTitle,
@@ -371,9 +372,10 @@ function HandlersTab({ q }: { q: ReturnType<typeof useQuery<{ handlers: Awaited<
               <Badge tone="brand" className="text-[10px]">handler</Badge>
             </div>
             <p className="text-sm text-[rgb(var(--fg))] mt-1">{h.description}</p>
-            <p className="text-xs text-[rgb(var(--fg-muted))] mt-2">
+            <p className="text-xs text-[rgb(var(--fg-muted))] mt-2 mb-3">
               <strong>When to use:</strong> {h.when_to_use}
             </p>
+            <HandlerRunner handler={h} />
           </CardBody>
         </Card>
       ))}
