@@ -46,6 +46,173 @@ async def process(
 
 
 # ---------------------------------------------------------------------------
+# /process/quick — parse + heuristic-only extraction, no LLM
+# ---------------------------------------------------------------------------
+# Mirrors DD's "fast lane" upload pattern: ingest the file, persist the
+# document + a batch record, run the deterministic regex extractor over
+# the parsed text, return the same BatchReport shape /process returns
+# so the frontend doesn't need a different code path. Typical latency:
+# ~1-2 s per file. Use this when:
+#   - Gemini quota is exhausted (free-tier daily cap hit)
+#   - The user wants to inspect parse results before paying for LLM
+#   - You want a low-cost extraction floor; LLM run later refines
+@router.post("/process/quick")
+async def process_quick(
+    files: list[UploadFile] = File(...),
+    tenant: Tenant = Depends(current_tenant),
+) -> dict[str, Any]:
+    """Heuristic-only ingest + extract. No LLM calls; no Pattern Cortex /
+    Hands invocation. Persists documents + extractions + a batch record
+    so the resulting batch_id is visible in /batches and openable via
+    /report/{id} just like a full pipeline run.
+    """
+    if not files:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "at least one file required")
+
+    from datetime import UTC, datetime
+
+    from mdi.brain.heuristic_extractor import extract_fields
+    from mdi.kernel import ingest as ingest_mod
+    from mdi.kernel.auth import tenant_session
+
+    started = datetime.now(UTC)
+    batch_id = uuid.uuid4()
+    docs_summary: list[dict[str, Any]] = []
+    clusters: dict[str, Any] = {}
+    extractions: dict[str, Any] = {}
+
+    # Process each file: parse → persist → heuristic extract.
+    async with tenant_session(tenant.id) as db:
+        for f in files:
+            content = await f.read()
+            doc = ingest_mod.ingest(f.filename or "unnamed", content)
+            # Persist document.
+            await db.execute(text(
+                "INSERT INTO documents "
+                "(id, tenant_id, batch_id, filename, mime_type, page_count, "
+                " bytes, sha256, cluster, layout) "
+                "VALUES (:id, :tid, :bid, :fn, :mt, :pc, :b, :s, '{}'::jsonb, :l)"
+            ), {
+                "id": str(doc.document_id), "tid": str(tenant.id),
+                "bid": str(batch_id), "fn": doc.filename,
+                "mt": doc.mime_type, "pc": doc.page_count, "b": doc.bytes,
+                "s": doc.sha256,
+                "l": "scanned" if doc.needs_vision else "free_text",
+            })
+            # Persist parsed text into doc_chunks so Raw-text + future
+            # heuristic re-extracts see the same text we just used.
+            page_text = doc.text or ""
+            if page_text:
+                # Single-chunk for short docs; chunked at 2000 chars for longer.
+                chunks = [page_text[i:i + 2000] for i in range(0, len(page_text), 2000)] or [""]
+                for idx, chunk_text in enumerate(chunks):
+                    await db.execute(text(
+                        "INSERT INTO doc_chunks "
+                        "(tenant_id, document_id, chunk_idx, text, token_count) "
+                        "VALUES (:tid, :did, :i, :t, :tk)"
+                    ), {
+                        "tid": str(tenant.id), "did": str(doc.document_id),
+                        "i": idx, "t": chunk_text,
+                        "tk": len(chunk_text.split()),
+                    })
+
+            # Run heuristic extractor.
+            field_map = extract_fields(page_text)
+            fields_json = {
+                k: (v.model_dump() if hasattr(v, "model_dump") else v)
+                for k, v in field_map.items()
+            }
+            # Persist extraction.
+            await db.execute(text(
+                "INSERT INTO extractions "
+                "(tenant_id, document_id, fields, field_confidences, "
+                " field_provenance, extraction_cost_usd) "
+                "VALUES (:tid, :did, CAST(:f AS JSONB), "
+                "        CAST('{}' AS JSONB), CAST('{}' AS JSONB), 0.0)"
+            ), {
+                "tid": str(tenant.id), "did": str(doc.document_id),
+                "f": _json_dump(fields_json),
+            })
+
+            # Heuristic cluster — best-effort.
+            vendor = (field_map.get("vendor") or
+                      _FieldExtractionPlaceholder(value="unknown")).value
+            cluster_obj = {
+                "industry": "general_business",
+                "vendor": str(vendor)[:255] if vendor else "unknown",
+                "doc_type": "invoice" if field_map.get("document_number") else "unknown",
+                "layout": "free_text",
+                "language": "en",
+                "confidence": 0.55,
+                "rationale": "heuristic / no-LLM extraction (quick mode)",
+            }
+            clusters[str(doc.document_id)] = cluster_obj
+            # Update document cluster col.
+            await db.execute(text(
+                "UPDATE documents SET cluster = CAST(:c AS JSONB) WHERE id = :id"
+            ), {"c": _json_dump(cluster_obj), "id": str(doc.document_id)})
+
+            extractions[str(doc.document_id)] = {"fields": fields_json}
+            docs_summary.append({
+                "document_id": str(doc.document_id),
+                "filename": doc.filename,
+                "mime_type": doc.mime_type,
+                "page_count": doc.page_count,
+                "bytes": doc.bytes,
+            })
+
+        finished = datetime.now(UTC)
+        narrator = (
+            f"Quick mode (no LLM). Parsed {len(files)} file(s), "
+            f"extracted heuristic fields via regex patterns."
+        )
+        report = {
+            "batch_id": str(batch_id),
+            "tenant_id": str(tenant.id),
+            "started_at": started.isoformat(),
+            "finished_at": finished.isoformat(),
+            "documents": docs_summary,
+            "clusters": clusters,
+            "extractions": extractions,
+            "anomalies": [],
+            "insights": [],
+            "pattern_matches": [],
+            "narrator_summary": narrator,
+            "total_cost_usd": 0.0,
+            "progress": [
+                "[1] ingest: parsed",
+                "[7] extract: heuristic (regex)",
+                "[16] report: assembled",
+            ],
+            "stage_evals": [],
+            "reflections": [],
+            "groups": [],
+            "briefings": [],
+            "graph_delta": {"nodes_added": 0, "edges_added": 0},
+        }
+        # Persist the batch row so it shows up in /batches.
+        await db.execute(text(
+            "INSERT INTO batches "
+            "(id, tenant_id, status, total_documents, started_at, "
+            " finished_at, cost_usd, report) "
+            "VALUES (:id, :tid, 'finished', :n, :s, :e, 0.0, CAST(:r AS JSONB))"
+        ), {
+            "id": str(batch_id), "tid": str(tenant.id),
+            "n": len(files), "s": started, "e": finished,
+            "r": _json_dump(report),
+        })
+        await db.commit()
+
+    return report
+
+
+class _FieldExtractionPlaceholder:
+    """Tiny stand-in so `.value` access is uniform when a field is absent."""
+    def __init__(self, value: Any = None) -> None:
+        self.value = value
+
+
+# ---------------------------------------------------------------------------
 # /report/{batch_id}
 # ---------------------------------------------------------------------------
 @router.get("/report/{batch_id}")

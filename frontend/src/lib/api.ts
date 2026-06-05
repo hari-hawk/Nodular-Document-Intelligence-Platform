@@ -220,11 +220,25 @@ async function request<T>(
 export const api = {
   health: () => request<{ status: string }>("/health"),
 
-  // Process a batch of uploaded files (multipart).
+  // Process a batch of uploaded files (multipart). Full pipeline including
+  // LLM-driven classification / extraction / insights — can take 30s+ per
+  // file when the LLM hits rate limits + retries.
   processBatch: (files: File[]) => {
     const fd = new FormData();
     for (const f of files) fd.append("files", f);
     return request<BatchReport>("/process", { method: "POST", body: fd });
+  },
+
+  // Fast lane: ingest + heuristic regex extraction only. No LLM calls,
+  // no Pattern Cortex, no insight generation. Returns in 1-2 s per file
+  // with whatever fields the deterministic patterns matched. Use this
+  // when the LLM is rate-limited or for an immediate value preview;
+  // analysts can run the full pipeline later via the document detail
+  // page's "Re-extract" button.
+  processBatchQuick: (files: File[]) => {
+    const fd = new FormData();
+    for (const f of files) fd.append("files", f);
+    return request<BatchReport>("/process/quick", { method: "POST", body: fd });
   },
 
   getReport: (batchId: string) =>

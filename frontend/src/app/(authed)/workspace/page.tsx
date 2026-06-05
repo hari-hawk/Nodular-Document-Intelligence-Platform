@@ -2,11 +2,13 @@
 
 import {
   Alert, Box, Button, Card, CardContent, Chip, IconButton,
-  LinearProgress, Stack, Typography,
+  LinearProgress, Stack, ToggleButton, ToggleButtonGroup, Tooltip,
+  Typography,
 } from "@mui/material";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
-  AlertCircle, CheckCircle2, FileText, FileStack, Sparkles, UploadCloud, X,
+  AlertCircle, CheckCircle2, FileText, FileStack, Play, Sparkles, Zap,
+  UploadCloud, X,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
@@ -59,16 +61,51 @@ export default function WorkspacePage() {
     retry: 0,
   });
 
+  // Processing mode — Quick (heuristic, no LLM, ~1-2s/file) vs Full
+  // (full 19-stage pipeline incl. LLM, ~30s/file). Default to Quick
+  // because the user can ALWAYS upgrade later (the document detail
+  // has a Re-extract button) and Quick gives immediate value even
+  // when LLM quota is exhausted.
+  const [mode, setMode] = useState<"quick" | "full">("quick");
+
+  // Multi-stage progress simulation. The /process endpoint is
+  // synchronous so we can't know the actual stage — but cycling
+  // through expected stages every ~1.5s reassures the user that work
+  // is happening. Stops + clears when the mutation resolves.
+  const [stage, setStage] = useState(0);
+  const stageTimer = useRef<ReturnType<typeof setInterval> | null>(null);
+  const stages = mode === "quick"
+    ? ["Uploading files", "Parsing PDF text", "Extracting fields", "Saving batch", "Done"]
+    : ["Uploading files", "Parsing", "Classifying (Eyes)", "Discovering schema (Pattern Cortex)",
+       "Extracting fields (Hands)", "Validating (Conscience)", "Detecting patterns",
+       "Generating insights", "Saving batch"];
+
   const upload = useMutation({
-    mutationFn: (toUpload: File[]) => api.processBatch(toUpload),
+    mutationFn: (toUpload: File[]) =>
+      mode === "quick" ? api.processBatchQuick(toUpload) : api.processBatch(toUpload),
+    onMutate: () => {
+      setStage(0);
+      stageTimer.current = setInterval(() => {
+        setStage((s) => Math.min(s + 1, stages.length - 2));
+      }, mode === "quick" ? 400 : 2500);
+    },
+    onSettled: () => {
+      if (stageTimer.current) clearInterval(stageTimer.current);
+      stageTimer.current = null;
+    },
     onSuccess: (r) => {
       setReport(r);
       setSelectedBatchId(r.batch_id ?? null);
       setOpenDocId(null);
       setFiles([]);
+      setStage(stages.length - 1);
       queryClient.invalidateQueries({ queryKey: ["recent-batches"] });
     },
   });
+
+  useEffect(() => () => {
+    if (stageTimer.current) clearInterval(stageTimer.current);
+  }, []);
 
   const onDrop = (e: React.DragEvent) => {
     e.preventDefault();
@@ -198,46 +235,162 @@ export default function WorkspacePage() {
           </Box>
 
           {files.length > 0 && (
-            <Stack spacing={1.5} sx={{ mt: 3 }}>
-              {files.map((f, i) => (
-                <Card key={i} variant="outlined" sx={{ p: 2 }}>
-                  <Stack direction="row" spacing={2} alignItems="center">
-                    <FileText size={18} style={{ flexShrink: 0, opacity: 0.6 }} />
-                    <Box sx={{ flex: 1, minWidth: 0 }}>
-                      <Typography variant="body2" sx={{ fontWeight: 500 }} noWrap>
-                        {f.name}
+            <Box sx={{ mt: 3 }}>
+              {/* File list */}
+              <Stack spacing={1.5}>
+                {files.map((f, i) => (
+                  <Card key={i} variant="outlined" sx={{ p: 2 }}>
+                    <Stack direction="row" spacing={2} alignItems="center">
+                      <Box
+                        sx={{
+                          width: 36, height: 36, flexShrink: 0,
+                          borderRadius: 1, display: "flex",
+                          alignItems: "center", justifyContent: "center",
+                          bgcolor: upload.isPending ? "primary.main" : "action.hover",
+                          color: upload.isPending ? "primary.contrastText" : "text.secondary",
+                          transition: "background-color .25s ease",
+                        }}
+                      >
+                        {upload.isPending ? (
+                          <Sparkles size={18} className="pulse" />
+                        ) : (
+                          <FileText size={18} />
+                        )}
+                      </Box>
+                      <Box sx={{ flex: 1, minWidth: 0 }}>
+                        <Typography variant="body2" sx={{ fontWeight: 500 }} noWrap>
+                          {f.name}
+                        </Typography>
+                        <Typography variant="caption" color="text.secondary">
+                          {(f.size / 1024).toFixed(1)} KB · {f.type || "unknown"}
+                        </Typography>
+                      </Box>
+                      <Chip
+                        size="small"
+                        label={upload.isPending ? "Processing" : "Ready"}
+                        color={upload.isPending ? "primary" : "default"}
+                        variant={upload.isPending ? "filled" : "outlined"}
+                      />
+                      {!upload.isPending && (
+                        <IconButton size="small" onClick={() => removeFile(i)} aria-label={`Remove ${f.name}`}>
+                          <X size={16} />
+                        </IconButton>
+                      )}
+                    </Stack>
+                  </Card>
+                ))}
+              </Stack>
+
+              {/* Action bar — mode toggle + big Process button */}
+              <Card
+                variant="outlined"
+                sx={{
+                  mt: 3,
+                  p: 2.5,
+                  bgcolor: (t) => t.palette.mode === "dark"
+                    ? "rgba(99,102,241,.05)" : "rgba(99,102,241,.03)",
+                  borderColor: "primary.main",
+                  borderWidth: 1,
+                }}
+              >
+                <Stack direction={{ xs: "column", md: "row" }} alignItems={{ md: "center" }} justifyContent="space-between" spacing={2}>
+                  <Box sx={{ flex: 1 }}>
+                    <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
+                      <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                        {files.length} file{files.length === 1 ? "" : "s"} queued
+                      </Typography>
+                      <Box component="span" sx={{ color: "text.disabled" }}>·</Box>
+                      <Typography variant="caption" color="text.secondary">
+                        Mode:
+                      </Typography>
+                      <ToggleButtonGroup
+                        value={mode}
+                        exclusive
+                        size="small"
+                        onChange={(_, v) => v && setMode(v)}
+                        disabled={upload.isPending}
+                        aria-label="Processing mode"
+                        sx={{ "& .MuiToggleButton-root": { py: 0.25, px: 1.5, fontSize: "0.7rem", textTransform: "none", fontWeight: 600 } }}
+                      >
+                        <ToggleButton value="quick">
+                          <Zap size={12} style={{ marginRight: 6 }} />
+                          Quick
+                        </ToggleButton>
+                        <ToggleButton value="full">
+                          <Sparkles size={12} style={{ marginRight: 6 }} />
+                          Full (LLM)
+                        </ToggleButton>
+                      </ToggleButtonGroup>
+                    </Stack>
+                    <Typography variant="caption" color="text.secondary">
+                      {mode === "quick"
+                        ? "Heuristic / regex extraction. ~1–2 s per file. Works without LLM quota — you can re-run with LLM later."
+                        : "Full 19-stage pipeline with LLM-driven extraction + insights. ~30 s per file."}
+                    </Typography>
+                  </Box>
+                  <Tooltip title={upload.isPending ? "Processing in progress" : `Start ${mode === "quick" ? "quick" : "full"} processing`}>
+                    <span>
+                      <Button
+                        variant="contained"
+                        size="large"
+                        onClick={() => upload.mutate(files)}
+                        disabled={upload.isPending}
+                        startIcon={<Play size={18} />}
+                        sx={{
+                          minWidth: 180,
+                          fontSize: "0.95rem",
+                          fontWeight: 700,
+                          py: 1.25,
+                          boxShadow: 2,
+                        }}
+                      >
+                        {upload.isPending ? "Processing…" : "Process now"}
+                      </Button>
+                    </span>
+                  </Tooltip>
+                </Stack>
+
+                {/* Progress: stage label + linear bar */}
+                {upload.isPending && (
+                  <Box sx={{ mt: 2.5 }}>
+                    <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1 }}>
+                      <Typography variant="caption" sx={{ fontWeight: 600, color: "primary.main" }}>
+                        {stages[stage] ?? "Working"}…
                       </Typography>
                       <Typography variant="caption" color="text.secondary">
-                        {(f.size / 1024).toFixed(1)} KB · {f.type || "unknown"}
+                        step {Math.min(stage + 1, stages.length)} of {stages.length}
                       </Typography>
-                    </Box>
-                    <IconButton size="small" onClick={() => removeFile(i)} aria-label={`Remove ${f.name}`}>
-                      <X size={16} />
-                    </IconButton>
-                  </Stack>
-                </Card>
-              ))}
-              <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ pt: 1 }}>
-                <Typography variant="body2" color="text.secondary">
-                  {files.length} file{files.length === 1 ? "" : "s"} queued
-                </Typography>
-                <Button
-                  variant="contained"
-                  size="large"
-                  onClick={() => upload.mutate(files)}
-                  disabled={upload.isPending}
-                >
-                  {upload.isPending ? "Processing…" : "Process"}
-                </Button>
-              </Stack>
-              {upload.isPending && <LinearProgress />}
-            </Stack>
+                    </Stack>
+                    <LinearProgress
+                      variant="determinate"
+                      value={Math.round(((stage + 1) / stages.length) * 100)}
+                      sx={{ height: 8, borderRadius: 999 }}
+                    />
+                  </Box>
+                )}
+              </Card>
+            </Box>
           )}
 
           {upload.isError && (
             <Alert severity="error" icon={<AlertCircle size={18} />} sx={{ mt: 2 }}>
               <Typography variant="body2" sx={{ fontWeight: 600 }}>Processing failed</Typography>
               <Typography variant="body2">{(upload.error as Error)?.message}</Typography>
+              <Typography variant="caption" sx={{ display: "block", mt: 1 }} color="text.secondary">
+                Tip: try <strong>Quick</strong> mode if LLM is rate-limited — it parses + extracts via
+                deterministic patterns without an LLM call.
+              </Typography>
+            </Alert>
+          )}
+
+          {upload.isSuccess && (
+            <Alert severity="success" icon={<CheckCircle2 size={18} />} sx={{ mt: 2 }}>
+              <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                Processed in {((Date.now() - new Date(report?.started_at || Date.now()).getTime()) / 1000).toFixed(1)}s
+              </Typography>
+              <Typography variant="caption">
+                {report?.documents.length} document{report?.documents.length === 1 ? "" : "s"} ready below.
+              </Typography>
             </Alert>
           )}
         </CardContent>
