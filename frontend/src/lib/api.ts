@@ -54,6 +54,30 @@ export type SpendSnapshot = {
   cap_enabled: boolean;
 };
 
+export type PatternSummary = {
+  id: string;
+  industry: string;
+  vendor: string;
+  doc_type: string;
+  seen_count: number;
+  last_seen_at: string | null;
+  created_at: string | null;
+  field_count: number;
+  rule_count: number;
+};
+
+export type PatternDetail = {
+  id: string;
+  industry: string;
+  vendor: string;
+  doc_type: string;
+  schema_def: { fields?: Array<{ name: string; type: string; required?: boolean; description?: string }>; primary_keys?: string[]; discovered_from?: string };
+  rules: { rules?: Array<{ rule_id: string; expression: string; severity: string; message: string; invented?: boolean }> };
+  seen_count: number;
+  last_seen_at: string | null;
+  created_at: string | null;
+};
+
 export type BatchSummary = {
   id: string;
   status: string;
@@ -167,6 +191,19 @@ export const api = {
   // Wave 3.2 — light-weight list of recent batches for the current tenant.
   listBatches: (limit = 20) =>
     request<{ batches: BatchSummary[] }>(`/batches?limit=${limit}`),
+
+  // Wave 3.3 — Hippocampus patterns explorer.
+  listPatterns: (params: { industry?: string; limit?: number } = {}) => {
+    const q = new URLSearchParams();
+    if (params.industry) q.set("industry", params.industry);
+    if (params.limit) q.set("limit", String(params.limit));
+    const qs = q.toString();
+    return request<{ patterns: PatternSummary[] }>(
+      `/admin/patterns${qs ? `?${qs}` : ""}`, {}, { admin: true },
+    );
+  },
+  getPattern: (id: string) =>
+    request<PatternDetail>(`/admin/patterns/${id}`, {}, { admin: true }),
 
   // Auto-pack proposals
   listAutoPacks: (statusFilter = "pending") =>

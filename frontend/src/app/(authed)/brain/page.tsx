@@ -3,7 +3,8 @@
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 
-import { api } from "@/lib/api";
+import { api, type PatternDetail, type PatternSummary } from "@/lib/api";
+import { cn } from "@/lib/cn";
 import {
   Badge, Button, Card, CardBody, CardDescription, CardHeader, CardTitle,
   EmptyState, Spinner, Tabs,
@@ -44,6 +45,11 @@ export default function BrainPage() {
     queryFn: () => api.listHandlers(),
     enabled: tab === "handlers",
   });
+  const patternsQ = useQuery({
+    queryKey: ["patterns"],
+    queryFn: () => api.listPatterns({ limit: 200 }),
+    enabled: tab === "patterns",
+  });
 
   return (
     <div className="space-y-6">
@@ -62,7 +68,8 @@ export default function BrainPage() {
             badge: autoPacksQ.data?.proposals.length },
           { value: "facts", label: "Tenant facts",
             badge: factsQ.data?.facts.length },
-          { value: "patterns", label: "Patterns" },
+          { value: "patterns", label: "Patterns",
+            badge: patternsQ.data?.patterns.length },
           { value: "handlers", label: "Handlers",
             badge: handlersQ.data?.handlers.length },
         ]}
@@ -70,7 +77,7 @@ export default function BrainPage() {
 
       {tab === "auto-packs" && <AutoPacksTab refetch={() => autoPacksQ.refetch()} q={autoPacksQ} />}
       {tab === "facts" && <FactsTab q={factsQ} />}
-      {tab === "patterns" && <PatternsStub />}
+      {tab === "patterns" && <PatternsTab q={patternsQ} />}
       {tab === "handlers" && <HandlersTab q={handlersQ} />}
     </div>
   );
@@ -187,20 +194,163 @@ function FactsTab({ q }: { q: ReturnType<typeof useQuery<{ facts: Awaited<Return
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Patterns stub — needs a /admin/patterns endpoint that doesn't exist yet
+// Patterns tab — Hippocampus memory browser (Wave 3.3)
 // ─────────────────────────────────────────────────────────────────────────────
-function PatternsStub() {
+function PatternsTab({ q }: { q: ReturnType<typeof useQuery<{ patterns: PatternSummary[] }>> }) {
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const detailQ = useQuery({
+    queryKey: ["pattern", selectedId],
+    queryFn: () => api.getPattern(selectedId!),
+    enabled: selectedId !== null,
+  });
+
+  if (q.isLoading) return <SpinnerCard />;
+  if (q.isError) return <ErrorCard error={q.error as Error} />;
+  const patterns = q.data?.patterns || [];
+  if (!patterns.length) {
+    return (
+      <Card><CardBody>
+        <EmptyState
+          title="No patterns yet"
+          subtitle="Patterns appear here as Hippocampus memorises documents the platform sees."
+        />
+      </CardBody></Card>
+    );
+  }
+
   return (
-    <Card><CardBody>
-      <EmptyState
-        title="Patterns explorer pending"
-        subtitle={
-          "Backend endpoint /admin/patterns is not yet implemented. " +
-          "Wave 2.1 surfaces per-batch pattern matches in BatchReport.pattern_matches " +
-          "— see the Workspace page's batch detail."
-        }
-      />
-    </CardBody></Card>
+    <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+      {/* Pattern list */}
+      <div className="md:col-span-2">
+        <Card>
+          <CardBody className="p-0">
+            <ul className="divide-y divide-[rgb(var(--border))] max-h-[600px] overflow-y-auto">
+              {patterns.map((p) => {
+                const active = p.id === selectedId;
+                return (
+                  <li key={p.id}>
+                    <button
+                      onClick={() => setSelectedId(p.id)}
+                      className={cn(
+                        "w-full text-left px-4 py-3 transition-colors",
+                        "hover:bg-[rgb(var(--surface-muted))]",
+                        active && "bg-brand-50 dark:bg-brand-900/30",
+                      )}
+                    >
+                      <div className="text-sm font-medium truncate">{p.vendor}</div>
+                      <div className="mt-0.5 text-xs text-[rgb(var(--fg-muted))] flex items-center gap-2">
+                        <Badge tone="neutral" className="text-[10px] py-0">{p.industry}</Badge>
+                        <span>{p.doc_type}</span>
+                      </div>
+                      <div className="mt-1.5 text-xs text-[rgb(var(--fg-muted))] flex items-center gap-3">
+                        <span>{p.field_count} fields</span>
+                        <span>{p.rule_count} rules</span>
+                        <span>seen {p.seen_count}×</span>
+                      </div>
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          </CardBody>
+        </Card>
+      </div>
+
+      {/* Pattern detail */}
+      <div className="md:col-span-3">
+        {selectedId === null ? (
+          <Card><CardBody>
+            <EmptyState title="Pick a pattern" subtitle="Click one on the left to inspect its schema and rules." />
+          </CardBody></Card>
+        ) : detailQ.isLoading ? (
+          <SpinnerCard />
+        ) : detailQ.isError ? (
+          <ErrorCard error={detailQ.error as Error} />
+        ) : (
+          <PatternDetailView detail={detailQ.data!} />
+        )}
+      </div>
+    </div>
+  );
+}
+
+function PatternDetailView({ detail }: { detail: PatternDetail }) {
+  const fields = detail.schema_def.fields || [];
+  const rules = detail.rules.rules || [];
+  return (
+    <div className="space-y-3">
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">{detail.vendor}</CardTitle>
+          <CardDescription>
+            {detail.industry} · {detail.doc_type} · seen {detail.seen_count}×
+            {detail.last_seen_at && (
+              <> · last {new Date(detail.last_seen_at).toLocaleString()}</>
+            )}
+          </CardDescription>
+        </CardHeader>
+        <CardBody className="p-0">
+          <Section title={`Schema (${fields.length} fields)`}>
+            {fields.length === 0 ? (
+              <div className="px-5 py-4 text-sm text-[rgb(var(--fg-muted))]">No fields recorded.</div>
+            ) : (
+              <table className="w-full text-sm">
+                <thead className="bg-[rgb(var(--surface-muted))] text-xs">
+                  <tr>
+                    <th className="text-left px-5 py-2">Name</th>
+                    <th className="text-left px-5 py-2">Type</th>
+                    <th className="text-left px-5 py-2">Required</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {fields.map((f, i) => (
+                    <tr key={i} className="border-t border-[rgb(var(--border))]">
+                      <td className="px-5 py-2 font-mono text-xs">{f.name}</td>
+                      <td className="px-5 py-2 text-xs">{f.type}</td>
+                      <td className="px-5 py-2 text-xs">{f.required ? "yes" : "—"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </Section>
+          <Section title={`Rules (${rules.length})`}>
+            {rules.length === 0 ? (
+              <div className="px-5 py-4 text-sm text-[rgb(var(--fg-muted))]">No rules recorded.</div>
+            ) : (
+              <ul className="divide-y divide-[rgb(var(--border))]">
+                {rules.map((r, i) => (
+                  <li key={i} className="px-5 py-3">
+                    <div className="flex items-baseline justify-between gap-2 mb-1">
+                      <span className="font-mono text-xs">{r.rule_id}</span>
+                      <span className="flex items-center gap-1">
+                        <Badge tone={r.severity === "HIGH" ? "danger" : r.severity === "MEDIUM" ? "warning" : "info"}>
+                          {r.severity}
+                        </Badge>
+                        {r.invented && <Badge tone="brand" className="text-[10px]">invented</Badge>}
+                      </span>
+                    </div>
+                    <div className="text-sm">{r.message || "—"}</div>
+                    <pre className="mt-1 text-xs text-[rgb(var(--fg-muted))] font-mono whitespace-pre-wrap break-all">{r.expression}</pre>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </Section>
+        </CardBody>
+      </Card>
+    </div>
+  );
+}
+
+function Section({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div className="border-t border-[rgb(var(--border))] first:border-t-0">
+      <div className="px-5 py-2.5 text-xs font-semibold text-[rgb(var(--fg-muted))] uppercase tracking-wider bg-[rgb(var(--surface-muted))]">
+        {title}
+      </div>
+      {children}
+    </div>
   );
 }
 

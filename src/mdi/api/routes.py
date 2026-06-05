@@ -788,6 +788,88 @@ async def admin_reject_auto_pack(
 
 
 # ---------------------------------------------------------------------------
+# Patterns explorer — what the brain has memorised (Wave 3.3)
+# ---------------------------------------------------------------------------
+@router.get("/admin/patterns")
+async def admin_list_patterns(
+    industry: str | None = None,
+    limit: int = 100,
+    tenant: Tenant = Depends(current_tenant),
+    db: AsyncSession = Depends(db_session),
+) -> dict[str, Any]:
+    """List Hippocampus patterns the tenant has accumulated.
+
+    Returns a lightweight summary per pattern — the full schema/rules
+    blobs only get fetched when the UI requests a single pattern via
+    GET /admin/patterns/{id}.
+
+    Why per-tenant: every pattern is RLS-scoped; the GUC bound from
+    current_tenant filters automatically.
+    """
+    _ = tenant  # RLS filters via app.tenant_id GUC
+    limit = max(1, min(int(limit), 500))
+    if industry:
+        rows = (await db.execute(text(
+            "SELECT id::text, industry, vendor, doc_type, "
+            "       seen_count, last_seen_at, created_at, "
+            "       jsonb_array_length(schema_def->'fields') AS field_count, "
+            "       jsonb_array_length(rules->'rules') AS rule_count "
+            "FROM patterns WHERE industry = :ind "
+            "ORDER BY seen_count DESC, last_seen_at DESC "
+            "LIMIT :limit"
+        ), {"ind": industry, "limit": limit})).all()
+    else:
+        rows = (await db.execute(text(
+            "SELECT id::text, industry, vendor, doc_type, "
+            "       seen_count, last_seen_at, created_at, "
+            "       jsonb_array_length(schema_def->'fields') AS field_count, "
+            "       jsonb_array_length(rules->'rules') AS rule_count "
+            "FROM patterns "
+            "ORDER BY seen_count DESC, last_seen_at DESC "
+            "LIMIT :limit"
+        ), {"limit": limit})).all()
+    return {
+        "patterns": [
+            {
+                "id": r[0], "industry": r[1], "vendor": r[2], "doc_type": r[3],
+                "seen_count": int(r[4] or 0),
+                "last_seen_at": str(r[5]) if r[5] else None,
+                "created_at": str(r[6]) if r[6] else None,
+                "field_count": int(r[7] or 0),
+                "rule_count": int(r[8] or 0),
+            }
+            for r in rows
+        ],
+    }
+
+
+@router.get("/admin/patterns/{pattern_id}")
+async def admin_get_pattern(
+    pattern_id: uuid.UUID,
+    tenant: Tenant = Depends(current_tenant),
+    db: AsyncSession = Depends(db_session),
+) -> dict[str, Any]:
+    """Full pattern detail — schema fields + rules. Used by the
+    Pattern detail drawer in the Brain page."""
+    _ = tenant
+    row = (await db.execute(text(
+        "SELECT id::text, industry, vendor, doc_type, schema_def, rules, "
+        "       seen_count, last_seen_at, created_at "
+        "FROM patterns WHERE id = :id"
+    ), {"id": str(pattern_id)})).first()
+    if row is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "pattern not found")
+    return {
+        "id": row[0], "industry": row[1], "vendor": row[2], "doc_type": row[3],
+        "schema_def": row[4] or {},
+        "rules": row[5] or {},
+        "seen_count": int(row[6] or 0),
+        "last_seen_at": str(row[7]) if row[7] else None,
+        "created_at": str(row[8]) if row[8] else None,
+    }
+
+
+# ---------------------------------------------------------------------------
 # Handler registry — code-bridge for patterns + commands (Wave 2.5)
 # ---------------------------------------------------------------------------
 @router.get("/admin/handlers", dependencies=[Depends(require_admin)])
