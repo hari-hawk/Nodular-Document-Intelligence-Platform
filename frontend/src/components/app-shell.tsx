@@ -7,7 +7,7 @@ import { useCallback, useEffect, useState } from "react";
 
 import { clearAuth, isAuthed } from "@/lib/api";
 import { cn } from "@/lib/cn";
-import { Badge, Button } from "./ui";
+import { Badge, Button, Logomark } from "./ui";
 import { ChatDrawer } from "./chat-drawer";
 
 /**
@@ -68,6 +68,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         )}
       >
         <div className="h-14 flex items-center px-5 border-b border-[rgb(var(--border))]">
+          <Logomark className="mr-2" />
           <div className="font-semibold tracking-tight">
             MDI<span className="text-brand-500">.</span>
           </div>

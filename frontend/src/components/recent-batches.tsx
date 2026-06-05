@@ -5,7 +5,7 @@ import { AlertCircle, Clock, FileStack, Sparkles } from "lucide-react";
 
 import { api, type BatchReport, type BatchSummary } from "@/lib/api";
 import { cn } from "@/lib/cn";
-import { Badge, Card, CardBody, CardDescription, CardHeader, CardTitle, EmptyState, Spinner } from "./ui";
+import { Badge, Card, CardBody, CardDescription, CardHeader, CardTitle, EmptyState, SkeletonRows } from "./ui";
 
 /**
  * Recent-batches list. Sits between Upload and Selected-batch on the
@@ -37,7 +37,12 @@ export function RecentBatches({
 
   if (q.isLoading) {
     return (
-      <Card><CardBody className="flex justify-center py-6"><Spinner /></CardBody></Card>
+      <Card>
+        <CardHeader>
+          <CardTitle>Recent batches</CardTitle>
+        </CardHeader>
+        <CardBody className="p-0"><SkeletonRows rows={3} /></CardBody>
+      </Card>
     );
   }
   if (q.isError) {

@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { setAuth } from "@/lib/api";
-import { Button, Card, CardBody, CardDescription, CardHeader, CardTitle, Input } from "./ui";
+import { Button, Card, CardBody, CardDescription, CardHeader, CardTitle, Input, Logomark } from "./ui";
 
 /**
  * Login surface. There's no real auth yet — for local dev the user
@@ -36,6 +36,7 @@ export function LoginScreen() {
       <Card className="w-full max-w-md">
         <CardHeader>
           <div className="flex items-center gap-2">
+            <Logomark className="h-8 w-8 text-sm" />
             <div className="text-xl font-semibold tracking-tight">
               MDI<span className="text-brand-500">.</span>
             </div>

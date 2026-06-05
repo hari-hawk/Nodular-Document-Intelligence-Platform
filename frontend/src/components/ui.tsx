@@ -233,3 +233,61 @@ export function Spinner({ className }: { className?: string }) {
     />
   );
 }
+
+/**
+ * Skeleton placeholder block. Much cheaper visually than a spinner
+ * for list/table loads — shows the SHAPE of the content that's
+ * coming, so the layout doesn't jump on data arrival.
+ */
+export function Skeleton({ className }: { className?: string }) {
+  return (
+    <div
+      className={cn(
+        "animate-pulse rounded bg-[rgb(var(--surface-muted))]",
+        className,
+      )}
+    />
+  );
+}
+
+/**
+ * Pre-built table-row skeleton — rows with two columns of varying
+ * widths. Used by tables that haven't loaded yet so the page reserves
+ * the right vertical space and doesn't shift around on data arrival.
+ */
+export function SkeletonRows({ rows = 4 }: { rows?: number }) {
+  return (
+    <div className="space-y-2 p-4">
+      {Array.from({ length: rows }).map((_, i) => (
+        <div key={i} className="flex items-center gap-3">
+          <Skeleton className="h-3 w-1/4" />
+          <Skeleton className="h-3 flex-1" />
+          <Skeleton className="h-3 w-16" />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/**
+ * Tiny MDI logomark. Intentionally minimal — a brand-coloured
+ * rounded square with `M` glyph, sized to fit alongside text.
+ * Replace with a designer mark once the brand book is written;
+ * for now this is enough to signal "this is a product, not a
+ * raw admin tool".
+ */
+export function Logomark({ className }: { className?: string }) {
+  return (
+    <span
+      className={cn(
+        "inline-flex h-6 w-6 items-center justify-center rounded-md",
+        "bg-gradient-to-br from-brand-500 to-brand-700",
+        "text-white text-xs font-bold tracking-tight",
+        className,
+      )}
+      aria-hidden="true"
+    >
+      M
+    </span>
+  );
+}

@@ -7,7 +7,7 @@ import { useState } from "react";
 import { api, type TenantCreateResult } from "@/lib/api";
 import {
   Badge, Button, Card, CardBody, CardDescription, CardHeader, CardTitle,
-  EmptyState, Input, Spinner, Tabs,
+  EmptyState, Input, SkeletonRows, Spinner, Tabs,
 } from "@/components/ui";
 
 /**
@@ -181,7 +181,7 @@ function TenantsTab() {
 
       {/* List */}
       {q.isLoading ? (
-        <Card><CardBody className="flex justify-center py-10"><Spinner /></CardBody></Card>
+        <Card><CardBody className="p-0"><SkeletonRows rows={5} /></CardBody></Card>
       ) : q.isError ? (
         <Card><CardBody className="text-sm text-red-600">{(q.error as Error).message}</CardBody></Card>
       ) : (q.data?.tenants.length ?? 0) === 0 ? (
@@ -333,12 +333,112 @@ function CreateTenantForm({
 }
 
 function SettingsStub() {
-  return (
-    <Card><CardBody>
-      <EmptyState
-        title="Settings pending"
-        subtitle="Theme + spend cap + provider chain controls will live here."
-      />
-    </CardBody></Card>
+  return <SettingsTab />;
+}
+
+function SettingsTab() {
+  const [theme, setTheme] = useState<"light" | "dark">(
+    typeof document !== "undefined" && document.documentElement.classList.contains("dark")
+      ? "dark" : "light",
   );
+
+  const setThemePersisted = (next: "light" | "dark") => {
+    document.documentElement.classList.toggle("dark", next === "dark");
+    try { localStorage.setItem("mdi.theme", next); } catch { /* ignore */ }
+    setTheme(next);
+  };
+
+  const adminKey = typeof window !== "undefined"
+    ? (localStorage.getItem("mdi.admin_key") || "")
+    : "";
+  const apiKey = typeof window !== "undefined"
+    ? (localStorage.getItem("mdi.api_key") || "")
+    : "";
+
+  const maskedAdmin = adminKey ? mask(adminKey) : "(not set)";
+  const maskedApi = apiKey ? mask(apiKey) : "(not set)";
+
+  const ping = useMutation({
+    mutationFn: () => api.health(),
+  });
+
+  return (
+    <div className="space-y-4">
+      <Card>
+        <CardHeader>
+          <CardTitle>Authentication</CardTitle>
+          <CardDescription>
+            Keys stored in this browser&apos;s localStorage. Sign out from the
+            sidebar to clear them.
+          </CardDescription>
+        </CardHeader>
+        <CardBody className="space-y-3">
+          <div className="grid grid-cols-1 sm:grid-cols-[140px_1fr] gap-2 sm:items-center text-sm">
+            <span className="text-[rgb(var(--fg-muted))]">Admin key</span>
+            <code className="font-mono text-xs">{maskedAdmin}</code>
+            <span className="text-[rgb(var(--fg-muted))]">API key</span>
+            <code className="font-mono text-xs">{maskedApi}</code>
+          </div>
+        </CardBody>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Appearance</CardTitle>
+        </CardHeader>
+        <CardBody>
+          <div className="flex items-center gap-2">
+            <Button
+              size="sm"
+              variant={theme === "light" ? "primary" : "secondary"}
+              onClick={() => setThemePersisted("light")}
+            >
+              Light
+            </Button>
+            <Button
+              size="sm"
+              variant={theme === "dark" ? "primary" : "secondary"}
+              onClick={() => setThemePersisted("dark")}
+            >
+              Dark
+            </Button>
+            <span className="ml-2 text-xs text-[rgb(var(--fg-muted))]">
+              The toggle in the sidebar does the same thing.
+            </span>
+          </div>
+        </CardBody>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Backend connection</CardTitle>
+          <CardDescription>
+            Pokes <code className="font-mono">/health</code> to confirm the API
+            server is reachable from this browser.
+          </CardDescription>
+        </CardHeader>
+        <CardBody className="flex items-center gap-3">
+          <Button size="sm" onClick={() => ping.mutate()} disabled={ping.isPending}>
+            {ping.isPending ? <Spinner className="border-white border-t-transparent" /> : null}
+            Ping /health
+          </Button>
+          {ping.data && (
+            <Badge tone="success">
+              {ping.data.status}
+            </Badge>
+          )}
+          {ping.isError && (
+            <span className="text-sm text-red-600 dark:text-red-400">
+              {(ping.error as Error).message}
+            </span>
+          )}
+        </CardBody>
+      </Card>
+    </div>
+  );
+}
+
+function mask(s: string): string {
+  if (s.length <= 8) return "•".repeat(s.length);
+  return s.slice(0, 4) + "…" + "•".repeat(8) + s.slice(-2);
 }
