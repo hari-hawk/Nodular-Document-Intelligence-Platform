@@ -178,10 +178,16 @@ class ApiError extends Error {
   }
 }
 
+/** Default request timeout — long enough for LLM-heavy endpoints, short
+ *  enough that "backend is down" surfaces as a clear error instead of an
+ *  indefinite loading spinner. /process and /process/quick override this
+ *  via opts.timeoutMs because they're allowed to be slow. */
+const DEFAULT_TIMEOUT_MS = 15_000;
+
 async function request<T>(
   path: string,
   init: RequestInit = {},
-  opts: { admin?: boolean; bothAuth?: boolean } = {},
+  opts: { admin?: boolean; bothAuth?: boolean; timeoutMs?: number } = {},
 ): Promise<T> {
   const headers = new Headers(init.headers || {});
   headers.set("Accept", "application/json");
@@ -204,7 +210,34 @@ async function request<T>(
     const k = getApiKey();
     if (k) headers.set("X-API-Key", k);
   }
-  const res = await fetch(`/api${path}`, { ...init, headers });
+
+  // AbortController-backed timeout — if the backend is unreachable or
+  // hangs, we want the query to flip from `isLoading` to `isError` so the
+  // user sees a real message rather than skeleton bars forever. We also
+  // compose with any caller-provided signal (e.g. React Query cancels on
+  // unmount) so neither path leaks an active fetch.
+  const timeoutMs = opts.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(new Error("timeout")), timeoutMs);
+  const callerSignal = init.signal;
+  if (callerSignal) {
+    if (callerSignal.aborted) ctrl.abort(callerSignal.reason);
+    else callerSignal.addEventListener("abort", () => ctrl.abort(callerSignal.reason), { once: true });
+  }
+
+  let res: Response;
+  try {
+    res = await fetch(`/api${path}`, { ...init, headers, signal: ctrl.signal });
+  } catch (e) {
+    // Distinguish timeout from genuine network error so the UI can show
+    // a friendlier message ("Backend isn't responding" vs "Network error").
+    if ((e as Error)?.name === "AbortError") {
+      throw new ApiError(0, null, `Request to ${path} timed out after ${timeoutMs}ms — is the backend running?`);
+    }
+    throw new ApiError(0, null, `Network error on ${path}: ${(e as Error).message}`);
+  } finally {
+    clearTimeout(timer);
+  }
   if (!res.ok) {
     let body: unknown = null;
     try { body = await res.json(); } catch { /* ignore */ }
@@ -222,11 +255,12 @@ export const api = {
 
   // Process a batch of uploaded files (multipart). Full pipeline including
   // LLM-driven classification / extraction / insights — can take 30s+ per
-  // file when the LLM hits rate limits + retries.
+  // file when the LLM hits rate limits + retries. Timeout is 5 min so the
+  // batch isn't aborted mid-pipeline on slow LLM days.
   processBatch: (files: File[]) => {
     const fd = new FormData();
     for (const f of files) fd.append("files", f);
-    return request<BatchReport>("/process", { method: "POST", body: fd });
+    return request<BatchReport>("/process", { method: "POST", body: fd }, { timeoutMs: 300_000 });
   },
 
   // Fast lane: ingest + heuristic regex extraction only. No LLM calls,
@@ -238,7 +272,7 @@ export const api = {
   processBatchQuick: (files: File[]) => {
     const fd = new FormData();
     for (const f of files) fd.append("files", f);
-    return request<BatchReport>("/process/quick", { method: "POST", body: fd });
+    return request<BatchReport>("/process/quick", { method: "POST", body: fd }, { timeoutMs: 60_000 });
   },
 
   getReport: (batchId: string) =>
@@ -317,12 +351,24 @@ export const api = {
   // Tenant usage
   getTenantUsage: () => request<{ tenant_id: string; monthly_cap_usd: number; spent_usd: number; events: number }>("/tenant/usage"),
 
-  // Chat
-  chat: (question: string, history: Array<{ role: string; content: string }> = []) =>
-    request<{ answer: string; route: string; citations: string[]; elapsed_ms: number }>("/chat", {
-      method: "POST",
-      body: JSON.stringify({ question, history }),
-    }),
+  // Chat — talks to the brain's hybrid retriever (graph + RAG + LLM).
+  //
+  // Backend routes the question to either:
+  //   - graph: deterministic answer from the knowledge graph (<100ms, no LLM)
+  //   - hybrid: graph context + RAG chunks + LLM synthesis (~3-10s)
+  //
+  // Caller passes `history` as the conversation *before* the current
+  // question — the backend appends the question itself, so we must NOT
+  // include it twice. Citations are returned as UUID strings that
+  // resolve to documents in the corpus.
+  chat: (question: string, history: Array<{ role: "user" | "assistant"; content: string }> = []) =>
+    request<{ answer: string; route: "graph" | "hybrid" | "llm"; citations: string[]; elapsed_ms: number }>(
+      "/chat",
+      { method: "POST", body: JSON.stringify({ question, history }) },
+      // Chat has its own longer ceiling because the LLM synthesis path
+      // can take 10-20s on Gemini Pro for complex cross-doc questions.
+      { timeoutMs: 45_000 },
+    ),
 
   // Per-document inspection (Wave 3.x — needed because LLM-driven
   // extraction can be rate-limited; analysts still need to see what

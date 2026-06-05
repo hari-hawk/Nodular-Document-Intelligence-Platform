@@ -43,6 +43,14 @@ export function RecentBatches({
   const q = useQuery({
     queryKey: ["recent-batches"],
     queryFn: () => api.listBatches(20),
+    // Retry once with a 1s backoff — covers a transient backend hiccup
+    // without keeping skeleton bars visible for 30+ seconds.
+    retry: 1,
+    retryDelay: 1_000,
+    // Don't refetch the list every time the window regains focus —
+    // analysts often tab back from a doc viewer; refetch is wasted.
+    refetchOnWindowFocus: false,
+    staleTime: 30_000,
   });
 
   if (q.isLoading) {
@@ -69,6 +77,7 @@ export function RecentBatches({
   if (q.isError) {
     const msg = (q.error as Error).message;
     const is401 = /\b401\b/.test(msg);
+    const isTimeout = /timed out|backend is running|Network error/i.test(msg);
     if (is401) {
       return (
         <Card>
@@ -81,6 +90,36 @@ export function RecentBatches({
             </Typography>
           </CardContent>
         </Card>
+      );
+    }
+    if (isTimeout) {
+      return (
+        <Alert
+          severity="warning"
+          icon={<AlertCircle size={18} />}
+          action={
+            <Box
+              component="button"
+              onClick={() => q.refetch()}
+              sx={{
+                border: 0, bgcolor: "transparent", cursor: "pointer",
+                color: "primary.main", fontWeight: 600, fontSize: 13,
+                "&:hover": { textDecoration: "underline" },
+              }}
+            >
+              Retry
+            </Box>
+          }
+        >
+          <Typography variant="body2" sx={{ fontWeight: 600 }}>
+            Backend isn&apos;t responding.
+          </Typography>
+          <Typography variant="caption" sx={{ display: "block", mt: 0.5 }}>
+            The API at <code>/api/batches</code> didn&apos;t reply within 15s. Check
+            that <code>mdi-server</code> is running on its expected port, then click
+            Retry above. {msg}
+          </Typography>
+        </Alert>
       );
     }
     return (
