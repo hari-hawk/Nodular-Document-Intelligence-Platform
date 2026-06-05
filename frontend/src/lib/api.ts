@@ -47,6 +47,23 @@ export type HandlerManifest = {
   when_to_use: string;
 };
 
+export type TenantRow = {
+  id: string;
+  slug: string;
+  display_name: string;
+  monthly_cost_cap_usd: number;
+  pack_slug: string | null;
+  created_at: string;
+};
+
+export type TenantCreateResult = {
+  tenant_id: string;
+  slug: string;
+  display_name: string;
+  api_key: string;  // SHOWN ONCE on creation
+  monthly_cost_cap_usd: number;
+};
+
 export type SpendSnapshot = {
   total_usd: number;
   by_backend: Record<string, number>;
@@ -241,6 +258,15 @@ export const api = {
 
   // Spend ledger
   getSpend: () => request<SpendSnapshot>("/admin/spend", {}, { admin: true }),
+
+  // Tenants (admin onboarding)
+  listTenants: () =>
+    request<{ tenants: TenantRow[] }>("/admin/tenants", {}, { admin: true }),
+  createTenant: (payload: { slug: string; display_name: string; monthly_cost_cap_usd?: number; pack_slug?: string | null }) =>
+    request<TenantCreateResult>("/admin/tenants", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }, { admin: true }),
 
   // Packs
   listPacks: () => request<{ packs: string[] }>("/admin/packs", {}, { admin: true }),
