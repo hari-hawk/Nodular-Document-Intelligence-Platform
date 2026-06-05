@@ -227,7 +227,8 @@ export const api = {
     return request<BatchReport>("/process", { method: "POST", body: fd });
   },
 
-  getReport: (batchId: string) => request<BatchReport>(`/report/${batchId}`),
+  getReport: (batchId: string) =>
+    request<BatchReport>(`/report/${batchId}`, {}, { bothAuth: true }),
 
   // Wave 3.2 — light-weight list of recent batches.
   // Accepts EITHER tenant API key OR admin key — both get sent and the

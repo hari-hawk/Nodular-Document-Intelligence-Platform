@@ -8,7 +8,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   AlertCircle, CheckCircle2, FileText, FileStack, Sparkles, UploadCloud, X,
 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { api, type BatchReport } from "@/lib/api";
 import { DocumentDetail, DocumentPicker } from "@/components/document-detail";
@@ -38,6 +38,20 @@ export default function WorkspacePage() {
   const [report, setReport] = useState<BatchReport | null>(null);
   const [selectedBatchId, setSelectedBatchId] = useState<string | null>(null);
   const [openDocId, setOpenDocId] = useState<string | null>(null);
+
+  // Anchor we scroll to when a batch is loaded — without this, clicking
+  // a batch deep in the recent-batches list updates the BatchOverview
+  // below but the user doesn't see it because their viewport is already
+  // up at the list. Smooth scroll = the missing UX feedback.
+  const detailAnchorRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    if (report && detailAnchorRef.current) {
+      // Defer one frame so the panel is in the DOM before scrolling.
+      requestAnimationFrame(() => {
+        detailAnchorRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+      });
+    }
+  }, [report?.batch_id]);
 
   const usageQ = useQuery({
     queryKey: ["tenant-usage"],
@@ -240,30 +254,32 @@ export default function WorkspacePage() {
       />
 
       {/* ─── Batch detail OR document drill-down ─── */}
-      {report ? (
-        openDoc ? (
-          <DocumentDetail
-            document={openDoc}
-            report={report}
-            onBack={() => setOpenDocId(null)}
-          />
+      <Box ref={detailAnchorRef} sx={{ scrollMarginTop: 16 }}>
+        {report ? (
+          openDoc ? (
+            <DocumentDetail
+              document={openDoc}
+              report={report}
+              onBack={() => setOpenDocId(null)}
+            />
+          ) : (
+            <BatchOverview
+              report={report}
+              onOpenDocument={(id) => setOpenDocId(id)}
+            />
+          )
         ) : (
-          <BatchOverview
-            report={report}
-            onOpenDocument={(id) => setOpenDocId(id)}
-          />
-        )
-      ) : (
-        <Card>
-          <CardContent sx={{ textAlign: "center", py: 8 }}>
-            <FileText size={32} style={{ opacity: 0.3, marginBottom: 16 }} />
-            <Typography variant="h4">No batch selected</Typography>
-            <Typography color="text.secondary" sx={{ mt: 1 }}>
-              Upload above or pick one from the list to see its results.
-            </Typography>
-          </CardContent>
-        </Card>
-      )}
+          <Card>
+            <CardContent sx={{ textAlign: "center", py: 8 }}>
+              <FileText size={32} style={{ opacity: 0.3, marginBottom: 16 }} />
+              <Typography variant="h4">No batch selected</Typography>
+              <Typography color="text.secondary" sx={{ mt: 1 }}>
+                Upload above or pick one from the list to see its results.
+              </Typography>
+            </CardContent>
+          </Card>
+        )}
+      </Box>
     </Stack>
   );
 }

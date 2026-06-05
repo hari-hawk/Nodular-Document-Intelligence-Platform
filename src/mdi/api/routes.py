@@ -51,12 +51,56 @@ async def process(
 @router.get("/report/{batch_id}")
 async def get_report(
     batch_id: uuid.UUID,
-    db: AsyncSession = Depends(db_session),
+    x_api_key: str | None = Header(default=None, alias="X-API-Key"),
+    x_admin_key: str | None = Header(default=None, alias="X-Admin-Key"),
+    authorization: str | None = Header(default=None),
 ) -> dict[str, Any]:
-    row = (await db.execute(select(Batch).where(Batch.id == batch_id))).scalar_one_or_none()
+    """Full batch report. Admin OR tenant auth.
+
+    Admin mode bypasses RLS so a platform admin can open any batch they
+    saw in /batches admin-listing. Tenant mode is RLS-scoped — fetching
+    another tenant's batch_id returns 404 (the row is invisible).
+    """
+    from mdi.api.deps import authenticate as _auth_tenant
+    from mdi.api.deps import require_admin as _require_admin
+    from mdi.kernel.auth import get_admin_engine, tenant_session
+
+    is_admin = False
+    tenant_uuid = None
+    if x_api_key or (authorization and authorization.lower().startswith("bearer ")):
+        tenant_uuid = await _auth_tenant(
+            authorization=authorization, x_api_key=x_api_key,
+        )
+    elif x_admin_key:
+        await _require_admin(x_admin_key=x_admin_key)
+        is_admin = True
+    else:
+        raise HTTPException(
+            status.HTTP_401_UNAUTHORIZED,
+            "/report requires either X-API-Key (tenant) or X-Admin-Key (admin)",
+        )
+
+    if is_admin:
+        engine = get_admin_engine()
+        async with engine.connect() as conn:
+            row = (await conn.execute(
+                text("SELECT report FROM batches WHERE id = :id"),
+                {"id": str(batch_id)},
+            )).first()
+    else:
+        async with tenant_session(tenant_uuid) as db:  # type: ignore[arg-type]
+            row = (await db.execute(
+                select(Batch).where(Batch.id == batch_id),
+            )).scalar_one_or_none()
+
     if row is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "batch not found")
-    return dict(row.report or {})
+    # Admin path returns a Row (tuple-like); tenant path returns a Batch ORM
+    # instance. Unify on the dict.
+    report = row[0] if isinstance(row, tuple) else (
+        row.report if hasattr(row, "report") else row
+    )
+    return dict(report or {})
 
 
 # ---------------------------------------------------------------------------
