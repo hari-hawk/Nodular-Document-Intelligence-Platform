@@ -511,8 +511,15 @@ async def run_batch_async(
 
     if persist:
         async with tenant_session(tid) as db:
+            # Pin the Batch row's id to the BatchReport.batch_id so the
+            # report payload and the DB row share an identifier.
+            # Without this, the row gets a DB-generated UUID that differs
+            # from report.batch_id and the frontend's listBatches() can't
+            # correlate "this just-finished upload" with "this row in the
+            # recent-batches list". (Wave 3.2 of the DD uplift.)
             db.add(
                 Batch(
+                    id=report.batch_id,
                     tenant_id=tid,
                     status="finished",
                     total_documents=len(documents),

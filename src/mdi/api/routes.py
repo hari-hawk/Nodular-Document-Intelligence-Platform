@@ -60,6 +60,55 @@ async def get_report(
 
 
 # ---------------------------------------------------------------------------
+# /batches — list recent batches for the current tenant (Wave 3.2)
+# ---------------------------------------------------------------------------
+@router.get("/batches")
+async def list_batches(
+    limit: int = 20,
+    tenant: Tenant = Depends(current_tenant),
+    db: AsyncSession = Depends(db_session),
+) -> dict[str, Any]:
+    """List recent batches for the current RLS tenant context.
+
+    Returns a lightweight summary (no full report payload) — the
+    Workspace page's list view doesn't need the JSONB blob, just enough
+    to render a row and let the user click into /report/{id} for detail.
+    """
+    _ = tenant  # RLS scopes the query via app.tenant_id GUC
+    limit = max(1, min(int(limit), 100))
+    rows = (await db.execute(text(
+        # Pull narrator_summary out of the JSONB report so the list view
+        # can show a one-line preview without loading the whole report.
+        # Same with anomaly + insight counts — useful for sorting / filtering
+        # by "batches that need attention" without an extra round-trip.
+        "SELECT id::text, status, total_documents, started_at, finished_at, "
+        "       cost_usd, "
+        "       LEFT(COALESCE(report->>'narrator_summary', ''), 240) AS narrator_preview, "
+        "       COALESCE(jsonb_array_length(report->'anomalies'), 0) AS anomaly_count, "
+        "       COALESCE(jsonb_array_length(report->'insights'), 0) AS insight_count "
+        "FROM batches "
+        "ORDER BY started_at DESC "
+        "LIMIT :limit"
+    ), {"limit": limit})).all()
+    return {
+        "batches": [
+            {
+                "id": r[0],
+                "status": r[1],
+                "total_documents": r[2],
+                "started_at": str(r[3]) if r[3] else None,
+                "finished_at": str(r[4]) if r[4] else None,
+                "cost_usd": float(r[5] or 0.0),
+                "narrator_preview": r[6] or "",
+                "anomaly_count": int(r[7] or 0),
+                "insight_count": int(r[8] or 0),
+            }
+            for r in rows
+        ],
+    }
+
+
+# ---------------------------------------------------------------------------
 # /chat
 # ---------------------------------------------------------------------------
 @router.post("/chat", response_model=ChatResponse)

@@ -1,11 +1,12 @@
 "use client";
 
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { AlertCircle, CheckCircle, ChevronDown, ChevronRight, FileText, UploadCloud } from "lucide-react";
 import { useState } from "react";
 
 import { api, BatchReport } from "@/lib/api";
 import { cn } from "@/lib/cn";
+import { RecentBatches } from "@/components/recent-batches";
 import {
   Badge, Button, Card, CardBody, CardDescription, CardHeader, CardTitle,
   EmptyState, Spinner,
@@ -29,12 +30,22 @@ import {
  * Upload card and the Selected-batch detail without restructuring.
  */
 export default function WorkspacePage() {
+  const queryClient = useQueryClient();
   const [files, setFiles] = useState<File[]>([]);
   const [report, setReport] = useState<BatchReport | null>(null);
+  const [selectedBatchId, setSelectedBatchId] = useState<string | null>(null);
 
   const upload = useMutation({
     mutationFn: (toUpload: File[]) => api.processBatch(toUpload),
-    onSuccess: (r) => setReport(r),
+    onSuccess: (r) => {
+      setReport(r);
+      // The upload just produced a new batch; refresh the list so the
+      // user sees it appear at the top without a manual reload. The
+      // batch_id comes back inside the report (set by the orchestrator).
+      setSelectedBatchId(r.batch_id ?? null);
+      setFiles([]);
+      queryClient.invalidateQueries({ queryKey: ["recent-batches"] });
+    },
   });
 
   const onDrop = (e: React.DragEvent) => {
@@ -144,6 +155,15 @@ export default function WorkspacePage() {
         </CardBody>
       </Card>
 
+      {/* ───────────── Recent batches ───────────── */}
+      <RecentBatches
+        selectedId={selectedBatchId}
+        onSelect={(r, summary) => {
+          setReport(r);
+          setSelectedBatchId(summary.id);
+        }}
+      />
+
       {/* ───────────── Batch detail ───────────── */}
       {report ? (
         <BatchDetail report={report} />
@@ -152,8 +172,8 @@ export default function WorkspacePage() {
           <CardBody>
             <EmptyState
               icon={<FileText className="h-8 w-8" />}
-              title="No batch yet"
-              subtitle="Upload some documents above and they'll appear here once the pipeline finishes."
+              title="No batch selected"
+              subtitle="Upload above or pick one from the list to see its results."
             />
           </CardBody>
         </Card>

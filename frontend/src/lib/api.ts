@@ -54,6 +54,18 @@ export type SpendSnapshot = {
   cap_enabled: boolean;
 };
 
+export type BatchSummary = {
+  id: string;
+  status: string;
+  total_documents: number;
+  started_at: string | null;
+  finished_at: string | null;
+  cost_usd: number;
+  narrator_preview: string;
+  anomaly_count: number;
+  insight_count: number;
+};
+
 export type BatchReport = {
   batch_id?: string;
   tenant_id: string;
@@ -151,6 +163,10 @@ export const api = {
   },
 
   getReport: (batchId: string) => request<BatchReport>(`/report/${batchId}`),
+
+  // Wave 3.2 — light-weight list of recent batches for the current tenant.
+  listBatches: (limit = 20) =>
+    request<{ batches: BatchSummary[] }>(`/batches?limit=${limit}`),
 
   // Auto-pack proposals
   listAutoPacks: (statusFilter = "pending") =>
