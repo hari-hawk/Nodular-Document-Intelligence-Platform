@@ -306,13 +306,276 @@ flowchart LR
 
 ---
 
+# Part C — Proposed Solutions & Future Roadmap  *(future)*
+
+Everything below is a deliberate next step — pieces we've designed for but haven't shipped yet. Sections are written so any one can be lifted straight into an implementation ticket. Priority pills indicate suggested build order (**P0** ship next → **P3** nice-to-have).
+
+## 1. Self-training & continuous learning
+
+The brain already memorises patterns and embeds analyst corrections, but the loop only closes when someone opens a document. The capabilities below let the loop close on its own.
+
+| Capability | Priority | What it does |
+|---|---|---|
+| **Active learning queue** | P0 | Extractions with confidence < 0.7 (or provider disagreement) go into a review queue with source text highlighted. One click ⇒ embedding ⇒ all similar future docs benefit. |
+| **Correction propagation** | P0 | On correction, ANN-search the corpus and silently re-extract the top-K most-similar past documents. Today we only bias future docs; this also fixes the past. |
+| **Pattern confidence decay** | P1 | Patterns not re-seen in 90 days lose match weight. Prevents stale layouts from dominating when vendors change templates. |
+| **Auto-pack auto-promotion** | P1 | Proposals that score ≥ 0.85 across N consecutive matches promote to first-class packs automatically. |
+| **Few-shot from corrections** | P1 | At extraction time, pull the 3 most-similar prior corrections via pgvector ANN and inject as ad-hoc few-shot examples in the Hands prompt. |
+| **Synthetic doc augmentation** | P2 | Once a pattern has 5+ corrections, Gemini Pro generates 20 synthetic layout variations + value pairs. Feeds regex + eval harness. |
+| **Per-tenant prompt overrides** | P2 | Each tenant supplies a 200-word "house style" preamble. Encodes things like "we always treat 'Net 30' as Net-30 from invoice date." |
+| **Tenant-scoped fine-tuning** | P3 | Once a tenant has 10 k+ corrections, fine-tune Llama 3 8B per-tenant. Routes their docs through the fine-tune first, falls back to Gemini on low confidence. |
+
+```mermaid
+flowchart LR
+  D[New document] --> X[Extract]
+  X --> C{Confidence >= 0.7?}
+  C -- yes --> O[Output]
+  C -- no --> Q[Active learning queue]
+  Q --> R[Analyst 1-click correction]
+  R --> E[Embed -> pgvector]
+  E --> P[Propagate to K most-similar past docs]
+  E -.few-shot inject.-> X
+  E -.bias future extracts.-> X
+  P --> O
+```
+*Figure 8 — Closed-loop self-training: one correction propagates both forward (future docs) and backward (past docs).*
+
+## 2. Domain- & dataset-specific extensibility
+
+Some verticals carry rules that can't be discovered from documents alone. Three lanes to inject that knowledge:
+
+| Lane | For whom | Mechanism |
+|---|---|---|
+| **YAML pack** | Domain expert *(no Python)* | Drop YAML into `packs/<industry>/` — schema, rules, validators, enrichment. Hot-reloaded. Already works for insurance + telecom. |
+| **Code-bridge handler** | Engineer *(vetted Python)* | Register a Python callable in `brain/handlers/`. LLM dispatches by name but never executes. Use for tax tables, live FX, ERP API calls, business-logic validators. |
+| **Dataset bootstrap** | Customer *(zero-code)* | Upload 5–10 labelled examples → LLM-as-judge generates a draft pack YAML + regex catalogue → customer reviews and commits. |
+
+### Example — customer-uploaded bootstrap sample
+
+```jsonc
+// POST /admin/bootstrap-pack — 6 labelled samples is usually enough
+{
+  "vertical": "logistics",
+  "vendor_hint": "DHL",
+  "samples": [
+    {
+      "file": "sample-1.pdf",
+      "labels": {
+        "awb_number": "7651234890",
+        "origin": "DEL",
+        "destination": "FRA",
+        "weight_kg": 12.4,
+        "chargeable_weight_kg": 14.0,
+        "freight_charge_usd": 187.50
+      }
+    }
+    // ... 4–9 more samples ...
+  ]
+}
+
+// Brain returns a generated pack scaffold:
+//   - schema/fields.yaml        ← 6 field definitions inferred
+//   - rules/validators.yaml     ← weight ≤ chargeable_weight invariant
+//   - prompts/awb.md            ← air-waybill-specific prompt
+//   - heuristic regex patches   ← AWB number format (10-digit, optional dash)
+```
+
+### Domain glossary vector store
+
+```csv
+# telecom-glossary.csv
+term,definition,canonical
+MRC,Monthly Recurring Charge,monthly_recurring_charge
+NRC,Non-Recurring Charge,non_recurring_charge
+USF,Universal Service Fund fee,usf_surcharge
+CSR,Customer Service Record,customer_service_record
+SIP DID,Session Initiation Protocol Direct Inward Dial,sip_did_number
+```
+
+### When to hard-code Python (and how to keep it safe)
+
+```python
+# brain/handlers/fx_convert.py
+from mdi.brain.bridge import register_handler
+
+@register_handler(
+    name="fx.convert",
+    description="Convert an amount between currencies using daily ECB rates.",
+    schema={"amount": "float", "from": "str", "to": "str"},
+)
+def fx_convert(amount: float, from_: str, to: str) -> dict:
+    rate = _fetch_ecb_rate(from_, to)         # cached, daily refresh
+    return {"value": amount * rate, "rate": rate, "source": "ECB"}
+
+# The LLM emits {"call": "fx.convert", "args": {...}} in its output.
+# The bridge validates against the schema, runs the handler, splices
+# the result back. The model NEVER executes Python — only describes it.
+```
+
+## 3. Email & inbox integration
+
+### Supported sources (roadmap)
+
+| Source | Mechanism | Notes |
+|---|---|---|
+| Gmail / Google Workspace | OAuth2 + Gmail API | Polling, or push via Pub/Sub `watch()` |
+| Microsoft 365 / Outlook | Graph API + Microsoft auth | Subscription-based push |
+| Generic IMAP | Long-poll IDLE | Self-hosted mail servers |
+| Forwarding alias | `uploads@<tenant>.mdi.app` | Zero-integration — just forward |
+
+### What the email parser extracts per inbound message
+
+```jsonc
+{
+  "thread_id": "<CAOj+abc123@gmail.com>",
+  "sender": {
+    "email": "billing@georgetownpaper.com",
+    "name":  "Georgetown Paper Stock",
+    "domain_trust": "known_vendor"     // known_vendor | new | suspicious
+  },
+  "subject": "Invoice INV-44128 — May 2026",
+  "keywords_matched": ["invoice", "INV-", "month + year"],
+  "intent_guess":  "new_invoice",
+  "attachments": [
+    {
+      "name": "INV-44128.pdf",
+      "size": 84320,
+      "sha256": "e3b0c4...",
+      "route":  "process_now"
+    }
+  ],
+  "body_extracted": {
+    "document_number": "INV-44128",
+    "period":          "May 2026",
+    "amount_due":      12450.00,
+    "due_date":        "2026-06-30"
+  },
+  "linked_documents": ["doc_b8a2..."]   // prior invoices from same sender
+}
+```
+
+### Subject-line keyword catalogue (initial set)
+
+| Intent | Keywords (subject or body) | Routing |
+|---|---|---|
+| **new_invoice** | `invoice` · `INV-` · `bill` · `statement` · `remittance` · `payment due` · `tax invoice` · `amount due` | Auto-process Full mode |
+| **purchase_order** | `PO #` · `purchase order` · `order confirmation` · `P.O.` · `order ack` | Auto-process + match to invoices |
+| **contract** | `agreement` · `MSA` · `SOW` · `renewal` · `addendum` · `amendment` · `NDA` | Route to legal-review queue |
+| **claim** | `claim no` · `policy #` · `loss notice` · `adjuster` · `FNOL` · `subrogation` | Insurance pack pipeline |
+| **receipt / paid** | `receipt` · `paid` · `payment confirmation` · `thank you for your payment` · `transaction` | Reconcile to prior invoice |
+| **support / dispute** | `issue` · `dispute` · `incorrect` · `refund` · `complaint` | Skip extraction, queue for human |
+| **reminder** | `overdue` · `past due` · `reminder` · `2nd notice` · `final notice` | Link to existing invoice, raise priority |
+
+### Auto-routing rules (customer-configurable, hot-reloaded YAML)
+
+```yaml
+routing:
+  - when:
+      sender_domain: "georgetownpaper.com"
+      subject_contains: ["invoice", "INV-"]
+    then:
+      tenant_id:        "tenant_acme_corp"
+      batch_label:      "Georgetown Monthly"
+      extraction_mode:  "full"
+      notify_on_anomaly: "#ops-channel"
+
+  - when:
+      sender_domain: "*.untrusted-domain.tld"
+    then:
+      action: "quarantine"
+      notify: "security@tenant.com"
+
+  - when:
+      subject_matches: "^Claim.*"
+      attachment_count: ">= 1"
+    then:
+      pack:             "insurance"
+      extraction_mode:  "full"
+      assignee:         "claims-desk@tenant.com"
+```
+
+```mermaid
+flowchart LR
+  IB[Inbox: Gmail · M365 · IMAP · forward-alias] --> P[Email parser]
+  P --> S{Sender trust}
+  S -- known vendor --> K[Keyword classifier]
+  S -- new sender --> NS[Sender review queue]
+  S -- blocklist --> QQ[Quarantine]
+  K --> I{Intent}
+  I -- invoice / PO / claim --> A[Auto-process Full mode]
+  I -- support / dispute --> H[Human queue]
+  I -- ambiguous --> R[Quick-mode preview + human confirm]
+  A --> MDI[MDI pipeline]
+  R --> MDI
+  MDI --> N[Notify: Slack · email · webhook]
+  NS -.promote.-> S
+```
+*Figure 9 — Inbound email pipeline: sender-trust gate → keyword classifier → intent-routed processing.*
+
+## 4. Expected scenarios & platform behaviour
+
+| Scenario | Today's behaviour | Target behaviour |
+|---|---|---|
+| **New vendor, first doc** | Hippocampus miss → Pattern Cortex discovers (~30 s) | + "first-seen vendor" badge so analyst pays extra attention |
+| **Known vendor, layout changed** | Pattern still matches; new fields may be wrong | Detect drift via embedding distance > threshold ⇒ re-run discovery, version the pattern |
+| **Multi-currency** | Currency extracted as string; no conversion | Detect currency code → `fx.convert` handler ⇒ store both original + base-currency |
+| **Multi-language** | EN + basic ES/FR; degrades silently otherwise | Eyes detects language ⇒ language-specific prompt; translation fallback |
+| **Scanned PDF (image only)** | Marked "needs review" — no text | VLM (Gemini 2.5 Pro vision) path: same schema, OCR-via-LLM, lower confidence cap |
+| **Mixed batch (invoices + POs + receipts)** | Each doc classified independently | + cross-doc reconciliation: receipts → invoices → POs matched inside the batch |
+| **High-volume batch (1 k+ docs)** | Sync `/process` times out | Async polling + per-doc status + webhook on batch completion |
+| **Duplicate document** | Re-extracted from scratch | SHA256 fingerprint cache ⇒ return prior extraction in < 5 ms |
+| **Multi-page table spanning pages** | Header repeated ⇒ may extract duplicates | Detect continuation via header similarity; stitch into one logical table |
+| **Handwritten annotation on printed form** | Often missed | Region-based VLM call on handwriting-detected zones |
+| **Two analysts disagree on a correction** | Last-write-wins, silent | Surface as conflict in Brain UI; supervisor resolves; loser kept as context |
+
+## 5. Gap closures — concrete tickets
+
+| Gap | Priority | Approach |
+|---|---|---|
+| Sync `/process` times out on large batches | P0 | Async job model: `POST /process` returns `batch_id` immediately; `GET /batches/{id}/status` per-doc state; optional SSE stream |
+| No webhook notifications | P0 | Per-tenant webhook URL + HMAC secret; fire on batch-complete, on each correction, on anomaly threshold |
+| Image-only PDFs marked unreadable | P1 | VLM path exists; wire it to the `needs_vision` flag Eyes already sets |
+| No bulk import from S3 / GCS / SharePoint / Drive | P1 | Connector pattern — one credential per source, scheduled poll, idempotent ingest keyed on file path + SHA |
+| Document fingerprint cache | P1 | SHA256 parsed text ⇒ cache key → extraction JSON for 30 days; skips LLM on every repeat |
+| Schema versioning | P2 | Each pattern row gets `version` + `supersedes`; old extractions stay queryable under the version they were produced under |
+| Table-aware extraction | P2 | Docling's structure-aware mode; LLM only on header rows, regex on body rows |
+| Conflict-resolution UI | P2 | New Brain tab "Conflicts" lists disagreeing corrections; supervisor picks winner |
+| Provider routing by complexity | P3 | Cheap doc → Flash; complex doc → Pro; fallback chain unchanged |
+| Handwriting-specialised OCR | P3 | VLM detects zones → TrOCR-style specialised model |
+
+## 6. Cost & throughput optimisations
+
+| Lever | Expected impact |
+|---|---|
+| SHA256 doc-fingerprint cache | ~15 % of repeat traffic skips the LLM entirely |
+| Embedding cache (text → vector) | Cuts bge-m3 compute ~40 % on retried batches |
+| Provider routing by complexity | ~60 % spend reduction on Flash-eligible docs |
+| Batched LLM calls (multi-doc per prompt) | ~25 % latency reduction on small docs |
+| Quick-mode auto-acceptance on high-confidence | ~30 % of routine invoices never need a Full-mode call |
+
+## 7. Suggested build order
+
+| Sprint | Theme | Tickets |
+|---|---|---|
+| **Sprint 1** (2 wks) | Async + observability | Async `/process` · webhook firing · active learning queue UI |
+| **Sprint 2** (2 wks) | Email ingestion v1 | Gmail OAuth + polling · subject-line classifier · forwarding alias · auto-routing YAML |
+| **Sprint 3** (2 wks) | Self-training v1 | Correction propagation · few-shot from corrections · auto-pack auto-promotion |
+| **Sprint 4** (3 wks) | VLM + handwriting | VLM path wired to `needs_vision` · scanned-PDF flow · domain glossary uploader |
+| **Sprint 5** (2 wks) | Dataset bootstrap | Upload-samples API · pack scaffolder · regex generator · per-tenant prompt overrides |
+| **Sprint 6** (2 wks) | Cost + scale | Fingerprint cache · embedding cache · provider routing by complexity |
+
+> **Hold-it bucket — park until a customer asks**: tenant-scoped fine-tuning · M365 Graph push subscription · handwriting-specialised OCR · multi-region GDPR sharding · on-prem deployment kit.
+
+---
+
 ## Sharing this document
 
 - **For executives + buyers**: share Part A above (mermaid renders as inline diagrams in any markdown viewer).
 - **For technical architects**: share Part B (the layered diagram + pipeline diagram + decision table cover the core architecture; the API table maps directly to what the UI consumes).
+- **For product / planning**: share Part C — it's the roadmap section, with concrete tickets and a suggested sprint order.
 - **GitHub / Notion / Confluence**: all three render Mermaid natively — paste this file in and the diagrams will appear.
-- **PDF export**: `pandoc PLATFORM_OVERVIEW.md -o overview.pdf` produces a print-ready handout.
+- **PDF export**: `pandoc platform-overview.md -o overview.pdf` produces a print-ready handout.
 
 ---
 
-*Last updated: 2026-06-05 · Maintained at `mdi/docs/PLATFORM_OVERVIEW.md`.*
+*Last updated: 2026-06-05 · Maintained at `mdi/documents/platform-overview.md` · HTML mirror at `mdi/documents/platform-overview.html`.*

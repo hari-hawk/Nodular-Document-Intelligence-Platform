@@ -264,6 +264,57 @@
     font-size: 14.5px;
   }
 
+  /* ─── Roadmap / future-work-specific styles ───────────────────── */
+  h2.part .future-pill {
+    background: #FEF3C7;
+    color: #92400E;
+  }
+  .priority-pill {
+    display: inline-block;
+    padding: 1px 7px;
+    border-radius: 4px;
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    vertical-align: middle;
+  }
+  .priority-p0 { background: #FEE2E2; color: #991B1B; }
+  .priority-p1 { background: #FEF3C7; color: #92400E; }
+  .priority-p2 { background: #DBEAFE; color: #1E40AF; }
+  .priority-p3 { background: #F1F5F9; color: #475569; }
+
+  .example-block {
+    background: #0F172A;
+    color: #E2E8F0;
+    padding: 16px 20px;
+    border-radius: 10px;
+    margin: 14px 0 18px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 12.5px;
+    line-height: 1.6;
+    overflow-x: auto;
+    box-shadow: var(--shadow);
+    white-space: pre;
+  }
+  .example-block .key { color: #93C5FD; }
+  .example-block .val { color: #FCD34D; }
+  .example-block .comment { color: #64748B; font-style: italic; }
+  .example-block .punct { color: #CBD5E1; }
+
+  .keyword-pill {
+    display: inline-block;
+    padding: 2px 8px;
+    margin: 2px 3px 2px 0;
+    background: var(--brand-50);
+    color: var(--brand-700);
+    border-radius: 4px;
+    font-family: ui-monospace, monospace;
+    font-size: 12px;
+    font-weight: 500;
+    border: 1px solid var(--brand-100);
+  }
+
   /* ─── Footer ───────────────────────────────────────────────────── */
   footer {
     margin-top: 60px;
@@ -765,6 +816,589 @@ flowchart LR
     <tr><td>Tenant isolation</td><td>RLS-enforced</td><td>yes + <code>FORCE ROW LEVEL SECURITY</code></td></tr>
     <tr><td>Provider fallback</td><td>automatic</td><td>Gemini → Claude via router</td></tr>
   </table>
+
+  <!-- ─── PART C — PROPOSED SOLUTIONS & FUTURE ROADMAP ────────────── -->
+  <h2 class="part">Part C — Proposed Solutions &amp; Future Roadmap<span class="pill future-pill">future</span></h2>
+
+  <p class="lede">
+    Everything below is a deliberate next step — pieces we've designed for but
+    haven't shipped yet. Sections are written so any one of them can be lifted
+    straight into an implementation ticket. Priority pills indicate suggested
+    build order (<span class="priority-pill priority-p0">P0</span> ship next →
+    <span class="priority-pill priority-p3">P3</span> nice-to-have).
+  </p>
+
+  <!-- ─── C.1 ─ Self-training ──────────────────────────────────── -->
+  <h3>1. Self-training &amp; continuous learning</h3>
+  <p>
+    The brain already memorises patterns and embeds analyst corrections, but the
+    feedback loop only closes when someone opens a document. The capabilities
+    below let the loop close on its own — the platform improves measurably each
+    week without manual intervention.
+  </p>
+
+  <table>
+    <tr>
+      <th style="width:26%">Capability</th>
+      <th style="width:10%">Priority</th>
+      <th>What it does</th>
+    </tr>
+    <tr>
+      <td><strong>Active learning queue</strong></td>
+      <td><span class="priority-pill priority-p0">P0</span></td>
+      <td>Any extraction with confidence &lt; 0.7 — or where two providers disagreed — drops into a review queue with the source text already highlighted. One analyst click ⇒ embedding written ⇒ all similar future docs benefit. Today this exists implicitly; surface it as a first-class queue with a weekly KPI ("docs improved this week").</td>
+    </tr>
+    <tr>
+      <td><strong>Correction propagation</strong></td>
+      <td><span class="priority-pill priority-p0">P0</span></td>
+      <td>When an analyst corrects a value, run an ANN search over the existing corpus and silently re-extract the top-K most-similar documents. Today we only bias <em>future</em> extractions — this also fixes <em>past</em> ones retroactively.</td>
+    </tr>
+    <tr>
+      <td><strong>Pattern confidence decay</strong></td>
+      <td><span class="priority-pill priority-p1">P1</span></td>
+      <td>Patterns not re-seen in 90 days lose weight in the matching score. Prevents stale layouts from dominating when a vendor changes their template.</td>
+    </tr>
+    <tr>
+      <td><strong>Auto-pack auto-promotion</strong></td>
+      <td><span class="priority-pill priority-p1">P1</span></td>
+      <td>After an auto-pack proposal scores ≥ 0.85 confidence across N consecutive successful matches, promote it to a first-class pack automatically. Today promotion is manual.</td>
+    </tr>
+    <tr>
+      <td><strong>Few-shot from corrections</strong></td>
+      <td><span class="priority-pill priority-p1">P1</span></td>
+      <td>At extraction time, pull the 3 most-similar prior corrections via pgvector ANN and inject them as ad-hoc few-shot examples in the Hands prompt. Today corrections only bias post-hoc — this fronts them straight into the model's context.</td>
+    </tr>
+    <tr>
+      <td><strong>Synthetic doc augmentation</strong></td>
+      <td><span class="priority-pill priority-p2">P2</span></td>
+      <td>Once a pattern has 5+ corrections, ask Gemini Pro to generate 20 synthetic layout variations + value pairs. Feeds the regex catalogue and the evaluation harness without waiting for real-world drift.</td>
+    </tr>
+    <tr>
+      <td><strong>Per-tenant prompt overrides</strong></td>
+      <td><span class="priority-pill priority-p2">P2</span></td>
+      <td>Each tenant supplies a 200-word "house style" preamble prepended to the Hands prompt. Encodes things like "we always treat 'Net 30' as Net-30 from invoice date, never receipt date."</td>
+    </tr>
+    <tr>
+      <td><strong>Tenant-scoped fine-tuning</strong></td>
+      <td><span class="priority-pill priority-p3">P3</span></td>
+      <td>Once a tenant has 10k+ corrections, fine-tune a small open-weight model (Llama 3 8B) per-tenant. Their docs route through the fine-tune first, fall back to Gemini on low confidence.</td>
+    </tr>
+  </table>
+
+  <div class="diagram">
+    <pre class="mermaid">
+flowchart LR
+  D[New document] --> X[Extract]
+  X --> C{Confidence<br/>≥ 0.7?}
+  C -- yes --> O[Output]
+  C -- no --> Q[Active learning queue]
+  Q --> R[Analyst reviews<br/>1 click correction]
+  R --> CR[Correction]
+  CR --> E[Embed → pgvector]
+  E --> P[Propagate to<br/>K most-similar past docs]
+  E -.few-shot inject.-> X
+  E -.bias future extracts.-> X
+  P --> O
+
+  style C fill:#FEF3C7,stroke:#92400E
+  style Q fill:#FEE2E2,stroke:#991B1B
+  style E fill:#DCFCE7,stroke:#15803D
+  style P fill:#DCFCE7,stroke:#15803D
+    </pre>
+    <div class="diagram-caption">Figure 8 — Closed-loop self-training: low-confidence extractions become training signal automatically; one correction propagates both forward (future docs) and backward (past docs).</div>
+  </div>
+
+  <!-- ─── C.2 ─ Domain extensibility ──────────────────────────── -->
+  <h3>2. Domain- &amp; dataset-specific extensibility</h3>
+  <p>
+    Some verticals carry rules that can't be discovered from documents alone —
+    they live in a domain expert's head or in a customer's ERP. We need clean
+    lanes to inject that knowledge without writing Python every time.
+  </p>
+
+  <h4>Three lanes for adding domain knowledge</h4>
+
+  <table>
+    <tr>
+      <th style="width:18%">Lane</th>
+      <th style="width:18%">For whom</th>
+      <th>Mechanism</th>
+    </tr>
+    <tr>
+      <td><strong>YAML pack</strong></td>
+      <td>Domain expert<br/><em>(no Python)</em></td>
+      <td>Drop a YAML file into <code>packs/&lt;industry&gt;/</code>: schema, rules, validators, enrichment tables. Hot-reloaded by the orchestrator. Already works for insurance + telecom — primary lane going forward.</td>
+    </tr>
+    <tr>
+      <td><strong>Code-bridge handler</strong></td>
+      <td>Engineer<br/><em>(vetted Python)</em></td>
+      <td>Register a Python callable in <code>brain/handlers/</code>. The LLM dispatches by name but never executes — the bridge keeps the model out of the call stack. Use for: tax-rate lookups, live FX conversion, ERP API calls, business-logic validators.</td>
+    </tr>
+    <tr>
+      <td><strong>Dataset bootstrap</strong></td>
+      <td>Customer<br/><em>(zero-code)</em></td>
+      <td>Upload 5–10 labelled examples through the UI → an LLM-as-judge generates a draft pack YAML + regex catalogue → customer reviews and commits. Best for niche customers ("we want to extract X from our supplier's PO format").</td>
+    </tr>
+  </table>
+
+  <h4>Example — what a customer-uploaded bootstrap sample looks like</h4>
+
+  <div class="example-block"><span class="comment"># POST /admin/bootstrap-pack — 6 labelled samples is usually enough</span>
+{
+  <span class="key">"vertical"</span>: <span class="val">"logistics"</span>,
+  <span class="key">"vendor_hint"</span>: <span class="val">"DHL"</span>,
+  <span class="key">"samples"</span>: [
+    {
+      <span class="key">"file"</span>: <span class="val">"sample-1.pdf"</span>,
+      <span class="key">"labels"</span>: {
+        <span class="key">"awb_number"</span>: <span class="val">"7651234890"</span>,
+        <span class="key">"origin"</span>: <span class="val">"DEL"</span>,
+        <span class="key">"destination"</span>: <span class="val">"FRA"</span>,
+        <span class="key">"weight_kg"</span>: <span class="val">12.4</span>,
+        <span class="key">"chargeable_weight_kg"</span>: <span class="val">14.0</span>,
+        <span class="key">"freight_charge_usd"</span>: <span class="val">187.50</span>
+      }
+    }
+    <span class="comment">// ... 4–9 more samples ...</span>
+  ]
+}
+
+<span class="comment"># Brain returns a generated pack scaffold:</span>
+<span class="comment">#   - schema/fields.yaml        ← 6 field definitions inferred</span>
+<span class="comment">#   - rules/validators.yaml     ← weight ≤ chargeable_weight invariant</span>
+<span class="comment">#   - prompts/awb.md            ← air-waybill-specific prompt</span>
+<span class="comment">#   - heuristic regex patches   ← AWB number format (10-digit, optional dash)</span>
+</div>
+
+  <h4>Domain glossary vector store</h4>
+  <p>
+    For domain-specific terminology (medical codes, telecom acronyms, legal
+    Latin), the customer uploads a glossary CSV. Each term is embedded; both
+    the chat layer and the Hands stage ANN-lookup unknown terms to resolve them.
+  </p>
+
+  <div class="example-block"><span class="comment"># telecom-glossary.csv</span>
+<span class="key">term</span>,<span class="key">definition</span>,<span class="key">canonical</span>
+<span class="val">MRC</span>,Monthly Recurring Charge,monthly_recurring_charge
+<span class="val">NRC</span>,Non-Recurring Charge,non_recurring_charge
+<span class="val">USF</span>,Universal Service Fund fee,usf_surcharge
+<span class="val">CSR</span>,Customer Service Record,customer_service_record
+<span class="val">SIP DID</span>,Session Initiation Protocol Direct Inward Dial,sip_did_number
+</div>
+
+  <h4>When to hard-code Python (and how to keep it safe)</h4>
+  <p>
+    Most domain rules belong in YAML. But some — live FX rates, tax tables,
+    ERP joins — need real code. The <strong>code-bridge</strong> pattern is the
+    only sanctioned way:
+  </p>
+
+  <div class="example-block"><span class="comment"># brain/handlers/fx_convert.py</span>
+<span class="key">from</span> mdi.brain.bridge <span class="key">import</span> register_handler
+
+<span class="key">@register_handler</span>(
+    name=<span class="val">"fx.convert"</span>,
+    description=<span class="val">"Convert an amount between currencies using daily ECB rates."</span>,
+    schema={<span class="key">"amount"</span>: <span class="val">"float"</span>, <span class="key">"from"</span>: <span class="val">"str"</span>, <span class="key">"to"</span>: <span class="val">"str"</span>},
+)
+<span class="key">def</span> fx_convert(amount: float, from_: str, to: str) -&gt; dict:
+    rate = _fetch_ecb_rate(from_, to)         <span class="comment"># cached, daily refresh</span>
+    <span class="key">return</span> {<span class="val">"value"</span>: amount * rate, <span class="val">"rate"</span>: rate, <span class="val">"source"</span>: <span class="val">"ECB"</span>}
+
+<span class="comment"># The LLM emits {"call": "fx.convert", "args": {...}} in its output.
+# The bridge validates against the schema, runs the handler, splices
+# the result back. The model NEVER executes Python — only describes it.</span>
+</div>
+
+  <!-- ─── C.3 ─ Email integration ─────────────────────────────── -->
+  <h3>3. Email &amp; inbox integration</h3>
+  <p>
+    Most business documents arrive by email. Today users drag-and-drop into the
+    Workspace — this section makes the platform a first-class participant in
+    the inbox itself.
+  </p>
+
+  <h4>Supported sources (roadmap)</h4>
+
+  <table>
+    <tr>
+      <th>Source</th>
+      <th>Mechanism</th>
+      <th>Notes</th>
+    </tr>
+    <tr><td>Gmail / Google Workspace</td><td>OAuth2 + Gmail API</td><td>Polling, or push via Pub/Sub <code>watch()</code> for near-real-time</td></tr>
+    <tr><td>Microsoft 365 / Outlook</td><td>Graph API + Microsoft auth</td><td>Subscription-based push</td></tr>
+    <tr><td>Generic IMAP</td><td>Long-poll IDLE</td><td>For self-hosted mail servers</td></tr>
+    <tr><td>Forwarding alias</td><td>Dedicated address (<code>uploads@&lt;tenant&gt;.mdi.app</code>)</td><td>Zero-integration option — just forward</td></tr>
+  </table>
+
+  <h4>What the email parser extracts per inbound message</h4>
+
+  <div class="example-block">{
+  <span class="key">"thread_id"</span>: <span class="val">"&lt;CAOj+abc123@gmail.com&gt;"</span>,
+  <span class="key">"sender"</span>: {
+    <span class="key">"email"</span>: <span class="val">"billing@georgetownpaper.com"</span>,
+    <span class="key">"name"</span>:  <span class="val">"Georgetown Paper Stock"</span>,
+    <span class="key">"domain_trust"</span>: <span class="val">"known_vendor"</span>     <span class="comment">// known_vendor | new | suspicious</span>
+  },
+  <span class="key">"subject"</span>: <span class="val">"Invoice INV-44128 — May 2026"</span>,
+  <span class="key">"keywords_matched"</span>: [<span class="val">"invoice"</span>, <span class="val">"INV-"</span>, <span class="val">"month + year"</span>],
+  <span class="key">"intent_guess"</span>:  <span class="val">"new_invoice"</span>,
+  <span class="key">"attachments"</span>: [
+    {
+      <span class="key">"name"</span>: <span class="val">"INV-44128.pdf"</span>,
+      <span class="key">"size"</span>: 84320,
+      <span class="key">"sha256"</span>: <span class="val">"e3b0c4..."</span>,
+      <span class="key">"route"</span>:  <span class="val">"process_now"</span>
+    }
+  ],
+  <span class="key">"body_extracted"</span>: {
+    <span class="key">"document_number"</span>: <span class="val">"INV-44128"</span>,
+    <span class="key">"period"</span>:          <span class="val">"May 2026"</span>,
+    <span class="key">"amount_due"</span>:      <span class="val">12450.00</span>,
+    <span class="key">"due_date"</span>:        <span class="val">"2026-06-30"</span>
+  },
+  <span class="key">"linked_documents"</span>: [<span class="val">"doc_b8a2..."</span>]   <span class="comment">// prior invoices from same sender</span>
+}
+</div>
+
+  <h4>Subject-line keyword catalogue (initial set)</h4>
+  <p>The parser classifies intent via a keyword catalogue per vertical. Customers can extend any row.</p>
+
+  <table>
+    <tr>
+      <th style="width:18%">Intent</th>
+      <th style="width:55%">Keywords matched (subject or body)</th>
+      <th>Routing action</th>
+    </tr>
+    <tr>
+      <td><strong>new_invoice</strong></td>
+      <td>
+        <span class="keyword-pill">invoice</span>
+        <span class="keyword-pill">INV-</span>
+        <span class="keyword-pill">bill</span>
+        <span class="keyword-pill">statement</span>
+        <span class="keyword-pill">remittance</span>
+        <span class="keyword-pill">payment due</span>
+        <span class="keyword-pill">tax invoice</span>
+        <span class="keyword-pill">amount due</span>
+      </td>
+      <td>Auto-process Full mode</td>
+    </tr>
+    <tr>
+      <td><strong>purchase_order</strong></td>
+      <td>
+        <span class="keyword-pill">PO #</span>
+        <span class="keyword-pill">purchase order</span>
+        <span class="keyword-pill">order confirmation</span>
+        <span class="keyword-pill">P.O.</span>
+        <span class="keyword-pill">order ack</span>
+      </td>
+      <td>Auto-process + match to invoices</td>
+    </tr>
+    <tr>
+      <td><strong>contract</strong></td>
+      <td>
+        <span class="keyword-pill">agreement</span>
+        <span class="keyword-pill">MSA</span>
+        <span class="keyword-pill">SOW</span>
+        <span class="keyword-pill">renewal</span>
+        <span class="keyword-pill">addendum</span>
+        <span class="keyword-pill">amendment</span>
+        <span class="keyword-pill">NDA</span>
+      </td>
+      <td>Route to legal-review queue</td>
+    </tr>
+    <tr>
+      <td><strong>claim</strong></td>
+      <td>
+        <span class="keyword-pill">claim no</span>
+        <span class="keyword-pill">policy #</span>
+        <span class="keyword-pill">loss notice</span>
+        <span class="keyword-pill">adjuster</span>
+        <span class="keyword-pill">FNOL</span>
+        <span class="keyword-pill">subrogation</span>
+      </td>
+      <td>Insurance pack pipeline</td>
+    </tr>
+    <tr>
+      <td><strong>receipt / paid</strong></td>
+      <td>
+        <span class="keyword-pill">receipt</span>
+        <span class="keyword-pill">paid</span>
+        <span class="keyword-pill">payment confirmation</span>
+        <span class="keyword-pill">thank you for your payment</span>
+        <span class="keyword-pill">transaction</span>
+      </td>
+      <td>Reconcile to prior invoice</td>
+    </tr>
+    <tr>
+      <td><strong>support / dispute</strong></td>
+      <td>
+        <span class="keyword-pill">issue</span>
+        <span class="keyword-pill">dispute</span>
+        <span class="keyword-pill">incorrect</span>
+        <span class="keyword-pill">refund</span>
+        <span class="keyword-pill">complaint</span>
+      </td>
+      <td>Skip extraction, queue for human</td>
+    </tr>
+    <tr>
+      <td><strong>reminder</strong></td>
+      <td>
+        <span class="keyword-pill">overdue</span>
+        <span class="keyword-pill">past due</span>
+        <span class="keyword-pill">reminder</span>
+        <span class="keyword-pill">2nd notice</span>
+        <span class="keyword-pill">final notice</span>
+      </td>
+      <td>Link to existing invoice, raise priority</td>
+    </tr>
+  </table>
+
+  <h4>Auto-routing rules (customer-configurable, hot-reloaded YAML)</h4>
+
+  <div class="example-block"><span class="key">routing</span>:
+  - <span class="key">when</span>:
+      <span class="key">sender_domain</span>: <span class="val">"georgetownpaper.com"</span>
+      <span class="key">subject_contains</span>: [<span class="val">"invoice"</span>, <span class="val">"INV-"</span>]
+    <span class="key">then</span>:
+      <span class="key">tenant_id</span>:        <span class="val">"tenant_acme_corp"</span>
+      <span class="key">batch_label</span>:      <span class="val">"Georgetown Monthly"</span>
+      <span class="key">extraction_mode</span>:  <span class="val">"full"</span>
+      <span class="key">notify_on_anomaly</span>: <span class="val">"#ops-channel"</span>
+
+  - <span class="key">when</span>:
+      <span class="key">sender_domain</span>: <span class="val">"*.untrusted-domain.tld"</span>
+    <span class="key">then</span>:
+      <span class="key">action</span>: <span class="val">"quarantine"</span>
+      <span class="key">notify</span>: <span class="val">"security@tenant.com"</span>
+
+  - <span class="key">when</span>:
+      <span class="key">subject_matches</span>: <span class="val">"^Claim.*"</span>
+      <span class="key">attachment_count</span>: <span class="val">"&gt;= 1"</span>
+    <span class="key">then</span>:
+      <span class="key">pack</span>:             <span class="val">"insurance"</span>
+      <span class="key">extraction_mode</span>:  <span class="val">"full"</span>
+      <span class="key">assignee</span>:         <span class="val">"claims-desk@tenant.com"</span>
+</div>
+
+  <div class="diagram">
+    <pre class="mermaid">
+flowchart LR
+  IB[Inbox<br/>Gmail · M365 · IMAP · forward-alias] --> P[Email parser]
+  P --> S{Sender trust}
+  S -- known vendor --> K[Keyword classifier]
+  S -- new sender --> NS[Sender review queue]
+  S -- blocklist / suspicious --> QQ[Quarantine]
+  K --> I{Intent}
+  I -- invoice / PO / claim --> A[Auto-process<br/>Full mode]
+  I -- support / dispute --> H[Human queue]
+  I -- ambiguous --> R[Quick-mode preview<br/>+ human confirm]
+  A --> MDI[MDI pipeline]
+  R --> MDI
+  MDI --> N[Notify<br/>Slack · email · webhook]
+  NS -.promote.-> S
+
+  style S fill:#FEF3C7,stroke:#92400E
+  style I fill:#EEF2FF,stroke:#4338CA
+  style QQ fill:#FEE2E2,stroke:#991B1B
+  style A fill:#DCFCE7,stroke:#15803D
+  style MDI fill:#C7D2FE,stroke:#312E81
+    </pre>
+    <div class="diagram-caption">Figure 9 — Inbound email pipeline: sender-trust gate → keyword classifier → intent-routed processing.</div>
+  </div>
+
+  <!-- ─── C.4 ─ Expected scenarios ────────────────────────────── -->
+  <h3>4. Expected scenarios &amp; platform behaviour</h3>
+  <p>How the platform should respond to common edge cases — each row is a contract for QA and customer expectations.</p>
+
+  <table>
+    <tr>
+      <th style="width:24%">Scenario</th>
+      <th style="width:36%">Today's behaviour</th>
+      <th>Target behaviour</th>
+    </tr>
+    <tr>
+      <td><strong>New vendor, first doc</strong></td>
+      <td>Hippocampus miss → Pattern Cortex discovers schema (~30 s LLM call)</td>
+      <td>Same, plus surface "first-seen vendor" badge so the analyst pays extra attention</td>
+    </tr>
+    <tr>
+      <td><strong>Known vendor, layout changed</strong></td>
+      <td>Pattern still matches; values may be wrong on new fields</td>
+      <td>Detect layout drift via embedding distance &gt; threshold ⇒ re-run discovery, version the pattern, keep both</td>
+    </tr>
+    <tr>
+      <td><strong>Multi-currency</strong></td>
+      <td>Currency extracted as string; no conversion</td>
+      <td>Detect currency code → <code>fx.convert</code> handler ⇒ store both original + base-currency value</td>
+    </tr>
+    <tr>
+      <td><strong>Multi-language</strong></td>
+      <td>Works for EN + basic ES/FR; degrades silently otherwise</td>
+      <td>Eyes detects language ⇒ language-specific prompt; translation fallback when no native prompt exists</td>
+    </tr>
+    <tr>
+      <td><strong>Scanned PDF (image only)</strong></td>
+      <td>Marked "needs review" — no text extracted</td>
+      <td>VLM (Gemini 2.5 Pro vision) path: same field schema, OCR-via-LLM, lower confidence cap</td>
+    </tr>
+    <tr>
+      <td><strong>Mixed batch (invoices + POs + receipts)</strong></td>
+      <td>Each doc classified independently — correct, but isolated</td>
+      <td>Cross-doc reconciliation: receipts → invoices → POs matched automatically inside the batch</td>
+    </tr>
+    <tr>
+      <td><strong>High-volume batch (1 k+ docs)</strong></td>
+      <td>Sync <code>/process</code> times out; must chunk client-side</td>
+      <td>Async polling endpoint + per-doc status; webhook callback on batch completion</td>
+    </tr>
+    <tr>
+      <td><strong>Duplicate document</strong></td>
+      <td>Re-extracted from scratch each time</td>
+      <td>SHA256 fingerprint cache ⇒ return prior extraction in &lt; 5 ms</td>
+    </tr>
+    <tr>
+      <td><strong>Multi-page table spanning pages</strong></td>
+      <td>Header repeated ⇒ may extract duplicates</td>
+      <td>Detect continuation via header similarity; stitch logically into one table</td>
+    </tr>
+    <tr>
+      <td><strong>Handwritten annotation on printed form</strong></td>
+      <td>Often missed</td>
+      <td>Region-based VLM call on handwriting-detected zones</td>
+    </tr>
+    <tr>
+      <td><strong>Two analysts disagree on the same correction</strong></td>
+      <td>Last-write-wins; silent</td>
+      <td>Surface as conflict in Brain UI; supervisor resolves; both embeddings retained as context</td>
+    </tr>
+  </table>
+
+  <!-- ─── C.5 ─ Gap closures ──────────────────────────────────── -->
+  <h3>5. Gap closures — concrete tickets</h3>
+
+  <table>
+    <tr>
+      <th style="width:34%">Gap</th>
+      <th style="width:10%">Priority</th>
+      <th>Approach</th>
+    </tr>
+    <tr>
+      <td>Sync <code>/process</code> times out on large batches</td>
+      <td><span class="priority-pill priority-p0">P0</span></td>
+      <td>Async job model: <code>POST /process</code> returns <code>batch_id</code> immediately; <code>GET /batches/{id}/status</code> returns per-doc state; optional SSE stream for live updates</td>
+    </tr>
+    <tr>
+      <td>No webhook notifications</td>
+      <td><span class="priority-pill priority-p0">P0</span></td>
+      <td>Per-tenant webhook URL + HMAC secret; fire on batch-complete, on each correction, on anomaly threshold</td>
+    </tr>
+    <tr>
+      <td>Image-only PDFs marked unreadable</td>
+      <td><span class="priority-pill priority-p1">P1</span></td>
+      <td>VLM path already exists in code; wire it to the <code>needs_vision</code> flag Eyes already sets</td>
+    </tr>
+    <tr>
+      <td>No bulk import from S3 / GCS / SharePoint / Drive</td>
+      <td><span class="priority-pill priority-p1">P1</span></td>
+      <td>Connector pattern — one credential per source, scheduled poll, idempotent ingest keyed on file path + SHA</td>
+    </tr>
+    <tr>
+      <td>Document fingerprint cache</td>
+      <td><span class="priority-pill priority-p1">P1</span></td>
+      <td>SHA256 the parsed text ⇒ cache key → extraction JSON for 30 days; saves an LLM call on every repeat</td>
+    </tr>
+    <tr>
+      <td>Schema versioning</td>
+      <td><span class="priority-pill priority-p2">P2</span></td>
+      <td>Each pattern row gets <code>version</code> + <code>supersedes</code>; old extractions stay queryable under the version they were produced under</td>
+    </tr>
+    <tr>
+      <td>Table-aware extraction</td>
+      <td><span class="priority-pill priority-p2">P2</span></td>
+      <td>Use Docling's structure-aware mode; LLM only on header rows, regex on body rows (already proven 10× faster on Georgetown invoices)</td>
+    </tr>
+    <tr>
+      <td>Conflict-resolution UI</td>
+      <td><span class="priority-pill priority-p2">P2</span></td>
+      <td>New Brain tab "Conflicts" lists corrections that disagree on the same field; supervisor picks winner; loser kept as context</td>
+    </tr>
+    <tr>
+      <td>Provider routing by document complexity</td>
+      <td><span class="priority-pill priority-p3">P3</span></td>
+      <td>Cheap doc → Gemini Flash; complex doc (long, multi-language, vision) → Gemini Pro; fallback chain unchanged</td>
+    </tr>
+    <tr>
+      <td>Handwriting-specialised OCR</td>
+      <td><span class="priority-pill priority-p3">P3</span></td>
+      <td>Detect handwritten zones via VLM bounding-box pass; OCR with a handwriting-specialised model (e.g. TrOCR)</td>
+    </tr>
+  </table>
+
+  <!-- ─── C.6 ─ Cost optimisations ────────────────────────────── -->
+  <h3>6. Cost &amp; throughput optimisations</h3>
+
+  <table>
+    <tr>
+      <th>Lever</th>
+      <th>Expected impact</th>
+    </tr>
+    <tr><td>SHA256 doc-fingerprint cache</td><td>~15 % of repeat traffic skips the LLM entirely</td></tr>
+    <tr><td>Embedding cache (text → vector)</td><td>Cuts bge-m3 compute ~40 % on retried batches</td></tr>
+    <tr><td>Provider routing by complexity</td><td>~60 % spend reduction on Flash-eligible docs</td></tr>
+    <tr><td>Batched LLM calls (multi-doc per prompt)</td><td>~25 % latency reduction on small docs</td></tr>
+    <tr><td>Quick-mode auto-acceptance on high-confidence</td><td>~30 % of routine invoices never need a Full-mode call</td></tr>
+  </table>
+
+  <!-- ─── C.7 ─ Build order ───────────────────────────────────── -->
+  <h3>7. Suggested build order</h3>
+
+  <table>
+    <tr>
+      <th style="width:14%">Sprint</th>
+      <th style="width:24%">Theme</th>
+      <th>Tickets</th>
+    </tr>
+    <tr>
+      <td><strong>Sprint 1</strong><br/><em>(2 wks)</em></td>
+      <td>Async + observability</td>
+      <td>Async <code>/process</code> · webhook firing · active learning queue UI</td>
+    </tr>
+    <tr>
+      <td><strong>Sprint 2</strong><br/><em>(2 wks)</em></td>
+      <td>Email ingestion v1</td>
+      <td>Gmail OAuth + polling · subject-line classifier · forwarding alias · auto-routing YAML</td>
+    </tr>
+    <tr>
+      <td><strong>Sprint 3</strong><br/><em>(2 wks)</em></td>
+      <td>Self-training v1</td>
+      <td>Correction propagation · few-shot from corrections · auto-pack auto-promotion</td>
+    </tr>
+    <tr>
+      <td><strong>Sprint 4</strong><br/><em>(3 wks)</em></td>
+      <td>VLM + handwriting</td>
+      <td>VLM path wired to <code>needs_vision</code> · scanned-PDF flow · domain glossary uploader</td>
+    </tr>
+    <tr>
+      <td><strong>Sprint 5</strong><br/><em>(2 wks)</em></td>
+      <td>Dataset bootstrap</td>
+      <td>Upload-samples API · pack scaffolder · regex generator · per-tenant prompt overrides</td>
+    </tr>
+    <tr>
+      <td><strong>Sprint 6</strong><br/><em>(2 wks)</em></td>
+      <td>Cost + scale</td>
+      <td>Fingerprint cache · embedding cache · provider routing by complexity</td>
+    </tr>
+  </table>
+
+  <div class="callout">
+    <strong>Hold-it bucket — park until a customer asks:</strong>
+    tenant-scoped fine-tuning · M365 Graph push subscription · handwriting-specialised OCR ·
+    multi-region GDPR sharding · on-prem deployment kit. All are real but speculative until
+    proven demand exists.
+  </div>
 
   <div class="callout">
     <strong>How to share this:</strong> the file is self-contained — Mermaid diagrams render on open via CDN.
