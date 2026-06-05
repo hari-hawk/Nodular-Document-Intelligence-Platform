@@ -1,0 +1,18 @@
+# Page-1 text signals used by Eyes to short-circuit the LLM classify call.
+# This file is consumed by mdi.kernel.pack_loader; the same content_signals
+# block in skills.yaml is what content_signals.detect_packs() reads at
+# runtime. Two copies feels redundant — the pack_loader uses this file
+# to validate the manifest's content_signals block matches.
+
+required_any:
+  - "Policy Number"
+  - "POLICY NUMBER"
+  - "Certificate of Insurance"
+  - "Adjuster Report"
+  - "Claim Number"
+
+doc_type_markers:
+  policy: ["Policy Declarations", "DECLARATIONS", "Premium"]
+  claim: ["Claim Number", "Loss Date", "Date of Loss"]
+  certificate_of_insurance: ["Certificate Holder", "Producer", "ACORD"]
+  adjuster_report: ["Adjuster", "Estimate of Loss", "Damage Assessment"]

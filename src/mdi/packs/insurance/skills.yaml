@@ -1,0 +1,75 @@
+version: 1.0.0-draft
+name: insurance
+description: |
+  Insurance vertical pack — handles policy declarations, claim
+  submissions, certificates of insurance (COI), and adjuster reports.
+  Built as Wave 4 of the DD-uplift to prove MDI is genuinely
+  cross-vertical: no platform code changed to add this pack, only
+  pack-internal files.
+
+  Industry coverage: auto, home, life, commercial property, commercial
+  liability, umbrella, health. The schema is intentionally narrow on
+  required fields (only `vendor` / `policy_number`) so partial
+  documents (a COI without a premium) still extract usefully.
+
+industry: insurance
+
+classifier:
+  signals: classifier/signals.yaml
+  fallback: llm
+
+field_schema: schema/fields.yaml
+doc_type_taxonomy: schema/doc_types.yaml
+
+extract_prompts:
+  policy: prompts/policy.md
+  claim: prompts/claim.md
+  certificate_of_insurance: prompts/certificate_of_insurance.md
+  adjuster_report: prompts/adjuster_report.md
+
+merge_rules: rules/merge.yaml
+validators: rules/validators.yaml
+
+enrichment:
+  domain_codes: enrichment/codes.yaml
+  alias_map: enrichment/aliases.yaml
+
+compliance:
+  business_rules: rules/compliance.yaml
+
+golden_seed: ../../eval/golden/insurance/
+
+# Wave 1.3 content signals — page-1 phrases that, if matched, route
+# directly to this pack without an LLM classify call.
+content_signals:
+  required_any:
+    - "Policy Number"
+    - "POLICY NUMBER"
+    - "Certificate of Insurance"
+    - "CERTIFICATE OF INSURANCE"
+    - "Adjuster Report"
+    - "Claim Number"
+  doc_type_markers:
+    policy:
+      - "Policy Declarations"
+      - "DECLARATIONS"
+      - "Effective Date"
+      - "Premium"
+    claim:
+      - "Claim Number"
+      - "Loss Date"
+      - "Date of Loss"
+      - "Claimant"
+    certificate_of_insurance:
+      - "Certificate Holder"
+      - "Producer"
+      - "ACORD"
+    adjuster_report:
+      - "ADJUSTER LOSS ESTIMATE"
+      - "Loss Estimate Report"
+      - "Estimate of Loss"
+      - "Scope of Damage"
+      - "SCOPE OF DAMAGE"
+      - "NET PAYABLE"
+      - "Adjuster:"
+      - "Independent Insurance Adjuster"

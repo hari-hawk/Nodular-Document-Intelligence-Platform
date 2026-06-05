@@ -1,0 +1,27 @@
+STATE FARM INSURANCE
+One State Farm Plaza · Bloomington, IL 61710
+
+HOMEOWNERS POLICY DECLARATIONS — HO-3
+======================================
+
+POLICY HOLDER:    Linda M. Park
+DWELLING ADDRESS: 88 Lakeshore Drive, Madison, WI 53703
+
+POLICY NUMBER:    HO-78451-MD
+POLICY TYPE:      Homeowners (HO-3)
+EFFECTIVE DATE:   2026-05-01
+EXPIRATION DATE:  2027-05-01
+ANNUAL PREMIUM:   $1,275.00
+
+COVERAGES:
+  Coverage A — Dwelling:                $450,000
+  Coverage B — Other Structures:         $45,000
+  Coverage C — Personal Property:       $225,000
+  Coverage D — Loss of Use:              $90,000
+  Coverage E — Personal Liability:      $500,000
+  Coverage F — Medical Payments:          $5,000
+
+DEDUCTIBLE:       $2,500 (All Perils)
+CURRENCY:         USD
+
+AGENT:            Marcus Wei, State Farm Madison · (608) 555-0142

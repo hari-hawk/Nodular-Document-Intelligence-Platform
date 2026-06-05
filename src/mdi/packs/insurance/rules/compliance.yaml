@@ -1,0 +1,22 @@
+# Insurance-specific compliance flags. These get evaluated after merge
+# (per Wave 2.2 detector pipeline) and surface as findings on the
+# document's review queue.
+
+rules:
+  - id: ins_policy_expired
+    description: "Policy expiration is in the past"
+    expression: "due_date is not None and due_date < today_iso"
+    severity: HIGH
+    when: "doc_type == 'policy'"
+
+  - id: ins_claim_within_policy_term
+    description: "Claim's date of loss should fall within the policy's effective..expiration window"
+    expression: "true"  # populated by the orchestrator after merge — left as the contract
+    severity: MEDIUM
+    when: "doc_type == 'claim'"
+
+  - id: ins_coi_expiring_soon
+    description: "Certificate of insurance expires within 30 days"
+    expression: "true"  # same — orchestrator wires the actual check
+    severity: INFO
+    when: "doc_type == 'certificate_of_insurance'"

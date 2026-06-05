@@ -37,6 +37,10 @@ ALIASES: dict[str, str] = {
     "supplier": "vendor",
     "supplier_name": "vendor",  # Gemini emits flat snake_case on POs sometimes
     "seller": "vendor",
+    # Insurance pack (Wave 4)
+    "carrier_name": "vendor",
+    "insurer_name": "vendor",
+    "insurance_company": "vendor",
 
     # Customer / billed party
     "customer_name": "customer",
@@ -44,6 +48,12 @@ ALIASES: dict[str, str] = {
     "buyer": "customer",
     "buyer_name": "customer",  # Gemini emits flat snake_case on POs sometimes
     "billed_party": "customer",
+    # Insurance pack (Wave 4)
+    "policy_holder": "customer",
+    "insured": "customer",
+    "named_insured": "customer",
+    "certificate_holder": "customer",
+    "claimant": "customer",
 
     # Document numbers
     "invoice_number": "document_number",
@@ -63,6 +73,11 @@ ALIASES: dict[str, str] = {
     "statement_date": "document_date",
     "expiration_date": "due_date",
     "payment_due_date": "due_date",
+    # Insurance pack (Wave 4)
+    "loss_date": "document_date",
+    "date_of_loss": "document_date",
+    "inception_date": "document_date",
+    "expiry_date": "due_date",
 
     # Amounts
     "total_amount": "total",
@@ -73,6 +88,17 @@ ALIASES: dict[str, str] = {
     "grand_total": "total",
     "amount_due": "total",
     "tax_amount": "tax",
+    # Insurance pack (Wave 4) — premium / claim / loss amounts collapse to `total`;
+    # coverage limits + face values land in `coverage_amount`.
+    "premium": "total",
+    "premium_amount": "total",
+    "claim_amount": "total",
+    "loss_amount": "total",
+    "loss_estimate": "total",
+    "estimated_loss": "total",
+    "coverage_limit": "coverage_amount",
+    "face_amount": "coverage_amount",
+    "face_value": "coverage_amount",
 
     # Accounts
     "account_no": "account_number",

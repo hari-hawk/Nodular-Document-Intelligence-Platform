@@ -1,0 +1,29 @@
+# Insurance domain codes used by enrichment + insight detectors.
+# Keep these intentionally small for v1 — extending them is a YAML
+# edit, not a code change, so packs can grow vocabulary organically.
+
+acord_forms:
+  ACORD-25: "Certificate of Liability Insurance"
+  ACORD-27: "Evidence of Property Insurance"
+  ACORD-28: "Evidence of Commercial Property Insurance"
+  ACORD-1: "Property Loss Notice"
+  ACORD-2: "Liability Loss Notice"
+  ACORD-3: "Auto Loss Notice"
+
+policy_classes:
+  auto:               ["Personal Auto", "Commercial Auto", "Private Passenger Auto"]
+  home:               ["Homeowners", "HO-3", "HO-5", "Dwelling Fire"]
+  life:               ["Term Life", "Whole Life", "Universal Life", "Variable Life"]
+  commercial_property: ["CP", "Commercial Property", "BOP"]
+  commercial_liability: ["CGL", "Commercial General Liability", "Professional Liability"]
+  umbrella:           ["Personal Umbrella", "Commercial Umbrella"]
+  health:             ["Group Health", "Individual Health", "Medical"]
+
+cause_of_loss_codes:
+  COL: "Collision"
+  COMP: "Comprehensive"
+  THEFT: "Theft"
+  FIRE: "Fire"
+  WATER: "Water Damage"
+  WIND: "Wind/Hail"
+  LIA: "Liability"

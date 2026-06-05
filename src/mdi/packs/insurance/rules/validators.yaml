@@ -1,0 +1,20 @@
+validators:
+  - id: ins_policy_dates_ordered
+    description: "effective_date must precede expiration_date"
+    expression: "document_date is None or due_date is None or document_date <= due_date"
+    severity: HIGH
+
+  - id: ins_total_positive
+    description: "premium / claim amount must be non-negative"
+    expression: "total is None or total >= 0"
+    severity: HIGH
+
+  - id: ins_deductible_lt_coverage
+    description: "deductible should be smaller than the coverage amount"
+    expression: "deductible is None or coverage_amount is None or deductible < coverage_amount"
+    severity: MEDIUM
+
+  - id: ins_currency_iso
+    description: "currency must be a 3-letter ISO 4217 code"
+    expression: "currency is None or (isinstance(currency, str) and len(currency) == 3)"
+    severity: LOW

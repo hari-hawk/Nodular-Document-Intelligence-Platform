@@ -1,0 +1,36 @@
+CRAWFORD & COMPANY · INDEPENDENT INSURANCE ADJUSTERS
+5335 Triangle Parkway · Peachtree Corners, GA 30092
+
+ADJUSTER LOSS ESTIMATE REPORT
+=============================
+
+REPORT NUMBER:    ADJ-2026-05-22189
+INSPECTION DATE:  2026-05-12
+CLAIM NUMBER:     CLM-2026-04-77231
+POLICY NUMBER:    AP-22117-450
+POLICY TYPE:      Personal Auto
+
+CARRIER:          Allstate Insurance Company
+CLAIMANT:         Rebecca J. Torres
+
+INSURED PROPERTY: 2019 TOYOTA RAV4, VIN JTMW1RFV4KD509812
+INSPECTION SITE:  Northshore Body & Repair, 2105 Lake St, Evanston, IL
+
+CAUSE OF LOSS:    Collision (rear-end)
+
+SCOPE OF DAMAGE:
+  - Rear bumper assembly: replacement
+  - Trunk lid: replacement (deformed)
+  - Tail-light housings (both sides): replacement
+  - Rear quarter panel (passenger side): repair + paint
+  - Hidden frame damage: none observed; alignment within spec
+
+ESTIMATED LOSS:   $8,425.50
+DEDUCTIBLE:           $500.00
+NET PAYABLE:      $7,925.50
+CURRENCY:         USD
+
+ADJUSTER:         Maria Bernstein · CIPA #4471
+NOTES:            Recommend approval. Repair estimate from approved
+                  network shop. Total loss not warranted (ACV well
+                  above repair cost).

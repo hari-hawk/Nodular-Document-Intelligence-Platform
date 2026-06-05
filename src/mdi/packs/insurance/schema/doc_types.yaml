@@ -1,0 +1,13 @@
+doc_types:
+  policy:
+    aliases: [policy_declaration, declarations_page, renewal_notice, endorsement]
+    description: Policy declaration page, renewal, or endorsement
+  claim:
+    aliases: [claim_form, claim_submission, first_notice_of_loss, fnol]
+    description: Claim submission or FNOL
+  certificate_of_insurance:
+    aliases: [coi, acord_certificate, evidence_of_insurance]
+    description: Proof-of-insurance certificate, typically ACORD-25 or ACORD-27
+  adjuster_report:
+    aliases: [estimate, loss_estimate, damage_assessment]
+    description: Adjuster's loss estimate or damage report

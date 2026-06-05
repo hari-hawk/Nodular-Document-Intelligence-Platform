@@ -1,0 +1,30 @@
+ALLSTATE INSURANCE COMPANY
+2775 Sanders Road · Northbrook, IL 60062
+
+CLAIM SUBMISSION — FIRST NOTICE OF LOSS
+========================================
+
+CLAIM NUMBER:     CLM-2026-04-77231
+POLICY NUMBER:    AP-22117-450
+DATE OF LOSS:     2026-04-18
+POLICY TYPE:      Personal Auto
+
+CLAIMANT:         Rebecca J. Torres
+ADDRESS:          1402 Maple Avenue, Evanston, IL 60201
+PHONE:            (847) 555-0166
+
+INSURED VEHICLE:  2019 TOYOTA RAV4, VIN JTMW1RFV4KD509812
+
+LOSS DESCRIPTION:
+  Rear-end collision at intersection of Sherman Ave & Davis St.
+  Vehicle struck while stopped at red light. Visible damage to
+  rear bumper, trunk, and tail lights. Drivable but cosmetically
+  significant.
+
+CLAIM AMOUNT REQUESTED:   $7,850.00
+POLICY DEDUCTIBLE:           $500.00
+COVERAGE LIMIT (Collision): $50,000
+
+ADJUSTER ASSIGNED: Trevor Holland · (847) 555-0298
+STATUS:           Open · Inspection scheduled 2026-04-25
+CURRENCY:         USD

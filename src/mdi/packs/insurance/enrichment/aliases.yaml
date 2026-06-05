@@ -1,0 +1,40 @@
+# Pack-scoped aliases. These extend the global _canonical_fields.ALIASES
+# with insurance-specific names the LLM might emit.
+
+aliases:
+  # Carrier / vendor variants — Insurance LLM emissions sometimes use these
+  carrier_name: vendor
+  insurer_name: vendor
+  insurance_company: vendor
+  provider: vendor          # life/health policies often use this
+
+  # Customer variants
+  policy_holder: customer
+  insured: customer
+  named_insured: customer
+  certificate_holder: customer
+  claimant: customer
+
+  # Document number variants — most map to document_number, but we keep
+  # policy_number and claim_number as SEPARATE first-class fields so a
+  # claim document can carry both.
+  certificate_number: document_number
+
+  # Date variants
+  effective_date: document_date
+  loss_date: document_date
+  date_of_loss: document_date
+  inception_date: document_date
+  expiration_date: due_date
+  expiry_date: due_date
+
+  # Amount variants
+  premium: total
+  premium_amount: total
+  claim_amount: total
+  loss_amount: total
+  loss_estimate: total
+  estimated_loss: total
+  coverage_limit: coverage_amount
+  face_amount: coverage_amount
+  face_value: coverage_amount

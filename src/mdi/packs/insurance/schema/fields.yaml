@@ -1,0 +1,97 @@
+fields:
+  - name: vendor
+    type: string
+    required: true
+    description: |
+      Insurance carrier name as printed (e.g., "State Farm Insurance",
+      "Allstate Insurance Company", "PROGRESSIVE INSURANCE"). Match the
+      capitalisation and exact wording on the document. On adjuster
+      reports, the vendor is the ADJUSTING firm (the report's issuer),
+      NOT the underlying carrier.
+
+  - name: customer
+    type: string
+    required: false
+    description: |
+      Policyholder / named insured / claimant / certificate holder as
+      printed. Single name only — additional insureds go elsewhere.
+
+  - name: document_number
+    type: string
+    required: false
+    description: |
+      The document's OWN identifier. For policies this IS the policy
+      number (emit the same value in both `document_number` and
+      `policy_number`). For claims this is the claim id. For COIs this
+      is the certificate id. For adjuster reports the report id.
+
+  - name: policy_number
+    type: string
+    required: false
+    description: |
+      Insurance policy identifier. For policy documents this equals
+      document_number — emit it in BOTH fields. For claims / COIs /
+      adjuster reports it's the UNDERLYING policy being referenced.
+
+  - name: policy_type
+    type: string
+    required: false
+    description: |
+      MUST be EXACTLY one lowercase token. Allowed values ONLY:
+      auto | home | life | commercial_property | commercial_liability
+      | umbrella | health
+      Do NOT emit the verbatim doc text (e.g. not "Personal Auto" →
+      use "auto"; not "Homeowners" → use "home"; not "Commercial
+      General Liability" → use "commercial_liability"). One token,
+      lowercase, snake_case where applicable. Never null when the
+      document indicates a coverage type.
+
+  - name: document_date
+    type: date
+    required: false
+    description: ISO-8601 YYYY-MM-DD. Effective date for policies, date of loss for claims, issue date for COIs, inspection date for adjuster reports.
+
+  - name: due_date
+    type: date
+    required: false
+    description: ISO-8601 YYYY-MM-DD. Policy expiration / COI expiration / claim deadline.
+
+  - name: currency
+    type: string
+    required: false
+    description: ISO 4217, three letters, uppercase. Default "USD" unless the document explicitly shows another.
+
+  - name: total
+    type: currency
+    required: false
+    description: |
+      Number, no $ or commas. For policies this is the PREMIUM (use the
+      figure as printed — don't annualise a 6-month premium). For claims
+      the requested claim amount. For COIs leave null. For adjuster
+      reports the NET PAYABLE (gross loss minus deductible) — NOT the
+      gross estimate.
+
+  - name: coverage_amount
+    type: currency
+    required: false
+    description: |
+      Number, no $ or commas. The PRIMARY headline coverage limit only:
+        - auto:  bodily-injury per-person limit (first of split limits)
+        - home:  Coverage A — Dwelling limit
+        - life:  face amount
+        - commercial_property: building limit
+        - commercial_liability: each-occurrence limit (NOT general aggregate)
+
+  - name: deductible
+    type: currency
+    required: false
+    description: Number, no $ or commas. The deductible amount that applies.
+
+  - name: insured_property
+    type: string
+    required: false
+    description: |
+      Single line description of what's insured: full vehicle make/model/VIN
+      for auto, full street address for home, insured's name for life.
+
+primary_keys: [policy_number, document_number]

@@ -1,0 +1,22 @@
+# Cross-doc merge rules — when multiple insurance docs reference the
+# same policy_number / claim_number / certificate, how to merge them.
+#
+# Keep this minimal at pack-launch. The platform's default cross-doc
+# merge (account-grouped, then field-resolved by confidence) covers
+# the common cases.
+
+merge_keys:
+  - policy_number
+  - claim_number
+  - document_number
+
+field_priorities:
+  # When the same field appears on multiple docs in the same group,
+  # which document type wins?
+  vendor: [policy, certificate_of_insurance, claim, adjuster_report]
+  customer: [policy, certificate_of_insurance, claim, adjuster_report]
+  policy_number: [policy, claim, certificate_of_insurance, adjuster_report]
+  document_date: [policy, certificate_of_insurance]  # effective date most authoritative on policy + COI
+  coverage_amount: [policy, certificate_of_insurance]
+  deductible: [policy, adjuster_report]
+  total: [adjuster_report, claim, policy]  # adjuster's loss estimate is most precise

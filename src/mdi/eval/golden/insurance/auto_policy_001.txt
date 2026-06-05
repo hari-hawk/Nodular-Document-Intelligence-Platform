@@ -1,0 +1,25 @@
+PROGRESSIVE INSURANCE
+1 Progressive Plaza · Mayfield Village, OH 44143
+
+POLICY DECLARATIONS
+===================
+
+NAMED INSURED:    John P. Smith
+ADDRESS:          412 Elm Street, Akron, OH 44303
+
+POLICY NUMBER:    AP-44719-002
+POLICY TYPE:      Personal Auto
+EFFECTIVE:        2026-03-15
+EXPIRATION:       2026-09-15
+PREMIUM:          $1,840.00 (6-month term)
+PAYMENT FREQUENCY: 6-month
+
+INSURED VEHICLE:  2021 HONDA CIVIC, VIN 19XFC2F58ME201234
+COVERAGE LIMITS:
+  Bodily Injury Liability:  $100,000 / $300,000
+  Property Damage:          $100,000
+  Comprehensive Deductible: $500
+  Collision Deductible:     $1,000
+
+AGENT:            Karen Lewis · (330) 555-0118 · karen.lewis@progressive.example
+CURRENCY:         USD

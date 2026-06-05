@@ -40,6 +40,26 @@ _GENERIC_FALLBACK = Schema(
 )
 
 
+def _fallback_for(cluster: Cluster) -> Schema:
+    """Generic fallback schema — but ALSO augmented with the pack's
+    declared fields so a rate-limited Pattern Cortex still gets the
+    pack-specific fields onto Hands' extraction surface. Without this
+    augmentation, every 429 from gemini-2.5-pro would silently downgrade
+    insurance docs back to the base 10-field schema."""
+    augmented, slug = _augment_with_pack(cluster, list(_GENERIC_FALLBACK.fields))
+    primary_keys = list(_GENERIC_FALLBACK.primary_keys)
+    if slug:
+        pk = _pack_primary_keys(slug)
+        if pk:
+            primary_keys = pk
+    return Schema(
+        fields=augmented,
+        primary_keys=primary_keys,
+        discovered_from="discovery",
+        pack_slug=slug,
+    )
+
+
 async def discover(
     doc: IngestedDocument,
     cluster: Cluster,
@@ -49,7 +69,7 @@ async def discover(
     gw = gateway or get_gateway()
     body = (doc.text or "")[:12000]
     if not body and not doc.images:
-        return _GENERIC_FALLBACK
+        return _fallback_for(cluster)
 
     prompt = (
         f"INDUSTRY: {cluster.industry}\nVENDOR: {cluster.vendor}\nDOC_TYPE: {cluster.doc_type}\n\n"
@@ -67,7 +87,7 @@ async def discover(
         )
     except Exception as e:
         logger.warning("pattern_cortex.gateway_error", error=str(e))
-        return _GENERIC_FALLBACK
+        return _fallback_for(cluster)
 
     try:
         data = json.loads(resp.text)
@@ -94,12 +114,106 @@ async def discover(
             except ValueError:
                 continue
         if not fields:
-            return _GENERIC_FALLBACK
+            return _fallback_for(cluster)
+
+        # Wave 4 — pack-augmentation: append the pack's declared fields
+        # to whatever the LLM discovered so pack-specific fields
+        # (policy_type, coverage_amount, etc.) always land in the
+        # schema Hands extracts against. Without this the LLM's
+        # open-vocab discovery skips insurance-specific fields it
+        # doesn't see strong cues for in the document body.
+        fields, pack_slug = _augment_with_pack(cluster, fields)
+        primary_keys = list(data.get("primary_keys", []))
+        # If the pack declares primary_keys (e.g. insurance: policy_number)
+        # and the LLM didn't, prefer the pack's authoritative list.
+        if pack_slug and not primary_keys:
+            primary_keys = _pack_primary_keys(pack_slug)
+
         return Schema(
             fields=fields,
-            primary_keys=list(data.get("primary_keys", [])),
+            primary_keys=primary_keys,
             discovered_from="discovery",
+            pack_slug=pack_slug,
         )
     except (json.JSONDecodeError, ValueError) as e:
         logger.warning("pattern_cortex.parse_error", error=str(e))
-        return _GENERIC_FALLBACK
+        return _fallback_for(cluster)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Pack-augmentation helpers (Wave 4)
+# ─────────────────────────────────────────────────────────────────────────────
+def _augment_with_pack(
+    cluster: Cluster,
+    discovered: list[FieldDef],
+) -> tuple[list[FieldDef], str | None]:
+    """If a pack's industry matches the cluster, append any pack-declared
+    fields the LLM didn't surface. Returns the augmented field list plus
+    the resolved pack_slug (None when no pack matched).
+
+    Failure is non-fatal: if pack-loading errors, the LLM-discovered
+    schema is returned unchanged.
+    """
+    try:
+        pack_slug = _resolve_pack_for_cluster(cluster)
+        if not pack_slug:
+            return discovered, None
+        from mdi.kernel.pack_loader import load_pack
+        pack = load_pack(pack_slug)
+        pack_fields = (pack.field_schema() or {}).get("fields") or []
+        existing = {f.name for f in discovered}
+        for raw in pack_fields:
+            name = raw.get("name")
+            ftype = raw.get("type")
+            if not name or not ftype or name in existing:
+                continue
+            try:
+                discovered.append(FieldDef(
+                    name=name,
+                    type=ftype,
+                    required=bool(raw.get("required", False)),
+                    description=str(raw.get("description", "")),
+                    examples=list(raw.get("examples", [])),
+                ))
+                existing.add(name)
+            except (ValueError, TypeError):
+                continue
+        return discovered, pack_slug
+    except Exception as e:
+        logger.warning("pattern_cortex.pack_augment_failed", error=str(e))
+        return discovered, None
+
+
+def _resolve_pack_for_cluster(cluster: Cluster) -> str | None:
+    """Find the pack slug whose `industry` matches cluster.industry.
+
+    Pack slugs and industry strings often coincide (insurance pack has
+    industry="insurance"), so this is cheap. Returns None if no pack
+    matches — the LLM's open-vocab schema is then used as-is.
+    """
+    try:
+        from mdi.kernel.pack_loader import list_packs, load_pack
+        # Fast path — try direct slug match first (common case).
+        slug = (cluster.industry or "").strip().lower()
+        if not slug:
+            return None
+        for s in list_packs():
+            try:
+                p = load_pack(s)
+            except Exception:
+                continue
+            if (p.manifest.get("industry") or s) == slug:
+                return s
+        return None
+    except Exception:
+        return None
+
+
+def _pack_primary_keys(pack_slug: str) -> list[str]:
+    try:
+        from mdi.kernel.pack_loader import load_pack
+        schema = load_pack(pack_slug).field_schema() or {}
+        keys = schema.get("primary_keys") or []
+        return [str(k) for k in keys]
+    except Exception:
+        return []

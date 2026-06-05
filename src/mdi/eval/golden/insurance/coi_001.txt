@@ -1,0 +1,41 @@
+ACORD-25 — CERTIFICATE OF LIABILITY INSURANCE
+
+ISSUE DATE:       2026-03-22
+CERTIFICATE NUMBER: COI-2026-03-9911
+
+PRODUCER:
+  Hartford Brokerage Services
+  120 Asylum Street, Hartford, CT 06103
+  Contact: Daniel O'Connor · (860) 555-0177
+
+INSURED (Named Insured):
+  Pinnacle Construction LLC
+  4500 West Side Drive, Houston, TX 77019
+
+CERTIFICATE HOLDER:
+  Globex Properties, Inc.
+  350 Fifth Avenue, New York, NY 10118
+
+INSURER:          THE HARTFORD FINANCIAL SERVICES GROUP
+
+POLICIES IN FORCE:
+  COMMERCIAL GENERAL LIABILITY
+    Policy Number:        CGL-HFD-2026-12871
+    Effective:            2026-01-01
+    Expiration:           2027-01-01
+    Each Occurrence:      $1,000,000
+    General Aggregate:    $2,000,000
+    Products/CompOp Agg:  $2,000,000
+
+  COMMERCIAL AUTO LIABILITY
+    Policy Number:        CAL-HFD-2026-44023
+    Effective:            2026-01-01
+    Expiration:           2027-01-01
+    Combined Single Limit: $1,000,000
+
+DESCRIPTION OF OPERATIONS:
+  General contractor — commercial construction projects in TX/LA/OK.
+  Certificate holder is an additional insured per CGL endorsement
+  CG-2010-04-13.
+
+CURRENCY:         USD
