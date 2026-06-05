@@ -1,0 +1,803 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MDI — Platform Overview</title>
+<link rel="preconnect" href="https://rsms.me/">
+<link rel="stylesheet" href="https://rsms.me/inter/inter.css">
+<style>
+  /* ──────────────────────────────────────────────────────────────────
+     MDI Platform Overview — print-friendly, screen-readable, brand-tinted.
+     Opens directly in Chrome via file:// or hosted anywhere; Mermaid
+     diagrams render client-side via the CDN block at the bottom.
+     ────────────────────────────────────────────────────────────────── */
+  :root {
+    --bg: #F8FAFC;
+    --surface: #FFFFFF;
+    --surface-muted: #F1F5F9;
+    --border: #E2E8F0;
+    --fg: #0F172A;
+    --fg-muted: #475569;
+    --fg-soft: #64748B;
+    --brand-50: #EEF2FF;
+    --brand-100: #E0E7FF;
+    --brand-500: #6366F1;
+    --brand-600: #4F46E5;
+    --brand-700: #4338CA;
+    --brand-900: #312E81;
+    --success: #16A34A;
+    --warning: #D97706;
+    --danger: #DC2626;
+    --info: #0EA5E9;
+    --shadow: 0 1px 2px rgba(15,23,42,.04), 0 4px 16px rgba(15,23,42,.06);
+  }
+
+  * { box-sizing: border-box; }
+  html { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--fg);
+    font-family: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    font-size: 15.5px;
+    line-height: 1.6;
+  }
+  ::selection { background: rgba(99,102,241,.22); }
+
+  .page {
+    max-width: 1080px;
+    margin: 0 auto;
+    padding: 40px 32px 80px;
+  }
+
+  /* ─── Hero ─────────────────────────────────────────────────────── */
+  header.hero {
+    background: linear-gradient(135deg, var(--brand-600), var(--brand-900));
+    color: #fff;
+    border-radius: 20px;
+    padding: 40px 40px 36px;
+    box-shadow: var(--shadow);
+    position: relative;
+    overflow: hidden;
+    margin-bottom: 32px;
+  }
+  header.hero::before {
+    content: "";
+    position: absolute;
+    top: -60px; right: -60px;
+    width: 240px; height: 240px;
+    background: radial-gradient(circle, rgba(255,255,255,.18) 0%, transparent 60%);
+    pointer-events: none;
+  }
+  .logo {
+    display: inline-flex; align-items: center; gap: 12px;
+    margin-bottom: 14px;
+  }
+  .logo-mark {
+    width: 36px; height: 36px;
+    border-radius: 10px;
+    background: linear-gradient(135deg, #FFFFFF, #C7D2FE);
+    color: var(--brand-700);
+    font-weight: 800; font-size: 18px;
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 4px 12px rgba(0,0,0,.15);
+  }
+  .logo-text { font-weight: 700; letter-spacing: -0.02em; font-size: 18px; }
+  .version-pill {
+    display: inline-block;
+    padding: 2px 10px;
+    background: rgba(255,255,255,.15);
+    border: 1px solid rgba(255,255,255,.25);
+    border-radius: 999px;
+    font-size: 11px; font-weight: 600;
+    letter-spacing: .04em; text-transform: uppercase;
+    margin-left: 8px;
+  }
+  header.hero h1 {
+    margin: 0 0 8px;
+    font-size: 36px; line-height: 1.1; font-weight: 800; letter-spacing: -0.03em;
+  }
+  header.hero .subtitle {
+    font-size: 17px; opacity: .9; max-width: 700px;
+    margin: 0 0 18px;
+  }
+  header.hero .one-liner {
+    font-style: italic; opacity: .85; font-size: 14.5px;
+    padding-left: 14px; border-left: 3px solid rgba(255,255,255,.4);
+  }
+
+  /* ─── Section headers ──────────────────────────────────────────── */
+  h2.part {
+    font-size: 12px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--brand-600);
+    font-weight: 700;
+    margin: 48px 0 4px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+  }
+  h2.part .pill {
+    display: inline-block;
+    margin-left: 8px;
+    padding: 2px 8px;
+    background: var(--brand-50);
+    border-radius: 999px;
+    font-size: 10px;
+    color: var(--brand-700);
+  }
+  h3 {
+    font-size: 22px; margin: 36px 0 10px;
+    font-weight: 700; letter-spacing: -0.02em;
+  }
+  h4 {
+    font-size: 16px; margin: 24px 0 8px;
+    font-weight: 600; color: var(--fg);
+  }
+  p { margin: 0 0 14px; }
+  p.lede {
+    font-size: 16px; color: var(--fg-muted);
+    max-width: 760px;
+  }
+  ul, ol { margin: 0 0 14px; padding-left: 22px; }
+  li { margin: 4px 0; }
+  strong { font-weight: 600; color: var(--fg); }
+  code {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.86em;
+    background: var(--surface-muted);
+    padding: 2px 6px;
+    border-radius: 4px;
+    color: var(--brand-700);
+  }
+
+  /* ─── Cards ────────────────────────────────────────────────────── */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 24px 28px;
+    box-shadow: var(--shadow);
+    margin: 16px 0 24px;
+  }
+  .card.tinted { background: var(--brand-50); border-color: var(--brand-100); }
+
+  /* ─── Tables ───────────────────────────────────────────────────── */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 16px 0 24px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+    font-size: 14px;
+  }
+  th, td {
+    text-align: left;
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border);
+    vertical-align: top;
+  }
+  th {
+    background: var(--surface-muted);
+    font-weight: 600;
+    color: var(--fg-muted);
+    font-size: 12px;
+    letter-spacing: .03em;
+    text-transform: uppercase;
+  }
+  tr:last-child td { border-bottom: 0; }
+  tr:hover td { background: var(--surface-muted); }
+
+  /* ─── Organ list ───────────────────────────────────────────────── */
+  .organs {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 12px;
+    margin: 16px 0 24px;
+  }
+  .organ {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px 18px;
+    display: flex; gap: 12px;
+  }
+  .organ .emoji { font-size: 22px; flex-shrink: 0; }
+  .organ .label { font-weight: 600; margin-bottom: 2px; }
+  .organ .desc { font-size: 13px; color: var(--fg-muted); line-height: 1.45; }
+
+  /* ─── Mermaid diagrams ─────────────────────────────────────────── */
+  .diagram {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 28px;
+    margin: 24px 0 28px;
+    box-shadow: var(--shadow);
+    overflow-x: auto;
+  }
+  .diagram-caption {
+    font-size: 12px; color: var(--fg-soft);
+    text-align: center;
+    margin-top: 12px;
+    font-style: italic;
+  }
+  /* Override mermaid colours to match our brand */
+  .mermaid .nodeLabel { font-family: "Inter", sans-serif !important; }
+
+  /* ─── Comparison grid ──────────────────────────────────────────── */
+  .compare {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+    margin: 16px 0 24px;
+    font-size: 14px;
+  }
+  .compare > div {
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border);
+  }
+  .compare > div:nth-child(3n) { border-right: 0; }
+  .compare > div:nth-child(3n+1) { border-right: 1px solid var(--border); font-weight: 500; }
+  .compare > div:nth-child(3n+2) { border-right: 1px solid var(--border); color: var(--fg-muted); }
+  .compare > div:nth-child(3n) { background: var(--brand-50); color: var(--brand-700); font-weight: 500; }
+  .compare > div.head {
+    background: var(--surface-muted) !important;
+    font-weight: 700; font-size: 12px;
+    color: var(--fg-muted); text-transform: uppercase; letter-spacing: .03em;
+  }
+
+  /* ─── Highlighted call-out ─────────────────────────────────────── */
+  .callout {
+    border-left: 4px solid var(--brand-500);
+    background: var(--brand-50);
+    padding: 14px 18px;
+    border-radius: 0 10px 10px 0;
+    margin: 16px 0;
+    color: var(--brand-900);
+    font-size: 14.5px;
+  }
+
+  /* ─── Footer ───────────────────────────────────────────────────── */
+  footer {
+    margin-top: 60px;
+    padding-top: 20px;
+    border-top: 1px solid var(--border);
+    color: var(--fg-soft);
+    font-size: 12.5px;
+    text-align: center;
+  }
+
+  /* ─── Print ────────────────────────────────────────────────────── */
+  @media print {
+    body { background: #fff; }
+    header.hero {
+      background: var(--brand-700) !important;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+    .page { padding: 0 16px; max-width: 100%; }
+    .card, .diagram, table { box-shadow: none; page-break-inside: avoid; }
+    h3 { page-break-after: avoid; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <!-- ─── HERO ─────────────────────────────────────────────────────── -->
+  <header class="hero">
+    <div class="logo">
+      <div class="logo-mark">M</div>
+      <div class="logo-text">MDI<span class="version-pill">v0.1</span></div>
+    </div>
+    <h1>Modular Data Intelligence</h1>
+    <p class="subtitle">
+      A self-learning document brain that turns any business document — invoices,
+      contracts, claims, certificates, statements — into structured, auditable data.
+    </p>
+    <div class="one-liner">
+      Upload any document → the brain reads it, extracts every field, learns the
+      pattern, and gets smarter for the next one.
+    </div>
+  </header>
+
+  <!-- ─── PART A — BUSINESS STAKEHOLDERS ─────────────────────────── -->
+  <h2 class="part">Part A — For Business Stakeholders<span class="pill">non-technical</span></h2>
+
+  <h3>The problem we solve</h3>
+  <p class="lede">
+    Every business receives documents from many vendors in many formats. Each one
+    needs structured data extracted — vendor, account, dates, totals, line items,
+    terms. Today this happens via manual data entry, per-vendor templates that
+    break the moment a layout changes, or rigid OCR rules that don't generalise.
+    <strong>MDI replaces all of that with a learning document brain.</strong>
+  </p>
+
+  <h3>How it works (the simple version)</h3>
+  <p>When you upload a document, six "organs" of the brain work together — and
+  remember what they learned for next time.</p>
+
+  <div class="organs">
+    <div class="organ">
+      <div class="emoji">👁</div>
+      <div>
+        <div class="label">Eyes</div>
+        <div class="desc">Looks at the document and identifies what it is — telecom invoice? insurance policy? purchase order?</div>
+      </div>
+    </div>
+    <div class="organ">
+      <div class="emoji">🧠</div>
+      <div>
+        <div class="label">Memory (Hippocampus)</div>
+        <div class="desc">Asks "have we seen this before?" — reuses what it learned, or discovers a new pattern.</div>
+      </div>
+    </div>
+    <div class="organ">
+      <div class="emoji">✋</div>
+      <div>
+        <div class="label">Hands</div>
+        <div class="desc">Reads out every field — vendor, account, dates, amounts, line items, addresses, terms.</div>
+      </div>
+    </div>
+    <div class="organ">
+      <div class="emoji">⚖️</div>
+      <div>
+        <div class="label">Conscience</div>
+        <div class="desc">Cross-checks the maths and flags anything suspicious (totals that don't add up, expired terms).</div>
+      </div>
+    </div>
+    <div class="organ">
+      <div class="emoji">💡</div>
+      <div>
+        <div class="label">Insight Cortex</div>
+        <div class="desc">Surfaces what's interesting: recurring vendors, pricing outliers, contracts about to expire.</div>
+      </div>
+    </div>
+    <div class="organ">
+      <div class="emoji">📝</div>
+      <div>
+        <div class="label">Brain memory</div>
+        <div class="desc">Stores the pattern + every correction, so the next similar document is faster and more accurate.</div>
+      </div>
+    </div>
+  </div>
+
+  <h3>Customer-facing flow</h3>
+
+  <div class="diagram">
+    <pre class="mermaid">
+flowchart LR
+  A[1. Upload<br/>any document] --> B[2. Identify<br/>what is this?]
+  B --> C[3. Extract<br/>read every field]
+  C --> D[4. Review<br/>fix anything wrong]
+  D --> E[5. Learn<br/>brain memorises<br/>your correction]
+  E -.benefits future docs.-> B
+
+  style A fill:#EEF2FF,stroke:#4F46E5,color:#1E1B4B
+  style B fill:#EEF2FF,stroke:#4F46E5,color:#1E1B4B
+  style C fill:#EEF2FF,stroke:#4F46E5,color:#1E1B4B
+  style D fill:#EEF2FF,stroke:#4F46E5,color:#1E1B4B
+  style E fill:#DCFCE7,stroke:#16A34A,color:#14532D
+    </pre>
+    <div class="diagram-caption">Figure 1 — The 5-step flow every customer sees.</div>
+  </div>
+
+  <h3>What makes MDI different</h3>
+
+  <div class="compare">
+    <div class="head">Capability</div>
+    <div class="head">Traditional OCR / templates</div>
+    <div class="head">MDI</div>
+
+    <div>Setup per vendor</div>
+    <div>Weeks of template authoring</div>
+    <div>Zero — discovers on first sight</div>
+
+    <div>Layout changes</div>
+    <div>Breaks silently</div>
+    <div>Adapts automatically</div>
+
+    <div>Learning from corrections</div>
+    <div>Manual rule edits</div>
+    <div>Corrections embed semantically and bias future extractions</div>
+
+    <div>Cross-vertical</div>
+    <div>One vertical per deployment</div>
+    <div>One platform, many verticals — packs add insurance / telecom / healthcare</div>
+
+    <div>LLM down?</div>
+    <div>Breaks entirely</div>
+    <div>Falls back to deterministic regex (~150 ms)</div>
+
+    <div>Multi-tenant</div>
+    <div>Per-customer instances</div>
+    <div>One platform, customer data isolated by row-level security</div>
+
+    <div>Audit trail</div>
+    <div>Partial / no provenance</div>
+    <div>Every value carries the exact text that drove it</div>
+  </div>
+
+  <h3>Two-speed processing</h3>
+  <p>You choose per upload — both produce the same output shape so the rest of the UI doesn't change.</p>
+
+  <table>
+    <tr>
+      <th style="width:24%">Mode</th>
+      <th style="width:18%">Latency</th>
+      <th style="width:14%">LLM cost</th>
+      <th>When to use</th>
+    </tr>
+    <tr>
+      <td><strong>⚡ Quick</strong></td>
+      <td>~150 ms / file</td>
+      <td>$0</td>
+      <td>Immediate inspection · demos · LLM rate-limited · batch screening</td>
+    </tr>
+    <tr>
+      <td><strong>✨ Full</strong></td>
+      <td>~30 s / file</td>
+      <td>$0.02–0.20</td>
+      <td>Production extraction with insights + pattern memory + the full 19-stage pipeline</td>
+    </tr>
+  </table>
+
+  <h3>Where MDI sits in your stack</h3>
+
+  <div class="diagram">
+    <pre class="mermaid">
+flowchart LR
+  Source[Documents arrive<br/>email · folder · API · upload] --> MDI
+  MDI[MDI Platform<br/>Document Brain]
+  MDI --> ERP[ERP / Accounting]
+  MDI --> CRM[CRM / Customer DB]
+  MDI --> Audit[Audit / Compliance Storage]
+  MDI --> BI[BI / Reporting]
+
+  Corrections[Analyst Corrections] -.continuously learn.-> MDI
+
+  style MDI fill:#6366F1,stroke:#312E81,color:#FFFFFF
+    </pre>
+    <div class="diagram-caption">Figure 2 — MDI sits between document sources and your downstream systems.</div>
+  </div>
+
+  <!-- ─── PART B — TECHNICAL ARCHITECTS ──────────────────────────── -->
+  <h2 class="part">Part B — For Technical Architects<span class="pill">technical</span></h2>
+
+  <h3>Stack at a glance</h3>
+
+  <table>
+    <tr>
+      <th style="width:18%">Layer</th>
+      <th style="width:32%">Technology</th>
+      <th>Reason</th>
+    </tr>
+    <tr><td><strong>API</strong></td><td>Python 3.11, FastAPI, async SQLAlchemy + asyncpg</td><td>Async-native, OpenAPI free, mature in fintech</td></tr>
+    <tr><td><strong>DB</strong></td><td>PostgreSQL 15 + pgvector + HNSW index</td><td>One engine for relational, vector ANN, and audit — minimises operational surface</td></tr>
+    <tr><td><strong>Tenant isolation</strong></td><td>Row Level Security + non-superuser app role (mdi_app, NOBYPASSRLS)</td><td>Enforced at the database. App bugs cannot leak cross-tenant data.</td></tr>
+    <tr><td><strong>Embeddings</strong></td><td>bge-m3 (1024 dim) via sentence-transformers</td><td>Open-weight, on-par with OpenAI ada-002, no vendor lock-in</td></tr>
+    <tr><td><strong>LLM providers</strong></td><td>Gemini 2.5 (Flash + Pro) primary; Claude (Haiku/Sonnet/Opus) fallback</td><td>Cost-optimised primary + resilience fallback; same prompt contract via router</td></tr>
+    <tr><td><strong>VLM (vision)</strong></td><td>Gemini 2.5 Pro vision; Claude 3.5 Sonnet vision</td><td>Scanned PDFs route via needs_vision flag set by Eyes</td></tr>
+    <tr><td><strong>Parsing</strong></td><td>pdfplumber, Docling</td><td>Text-mode + layout-aware modes</td></tr>
+    <tr><td><strong>Heuristic extractor</strong></td><td>Pure Python regex catalogue</td><td>Deterministic floor — always-on path even without LLM</td></tr>
+    <tr><td><strong>Observability</strong></td><td>Self-hosted Langfuse + structlog</td><td>Per-LLM-call trace UI without sending prompts to a 3rd-party cloud</td></tr>
+    <tr><td><strong>Cost control</strong></td><td>CostTracker (in-memory daily) + SpendLedger (file-backed cumulative)</td><td>Hard cap + soft warn, raises before the API call fires</td></tr>
+    <tr><td><strong>Cache / queue</strong></td><td>Redis 7</td><td>Celery broker + result backend</td></tr>
+    <tr><td><strong>Frontend</strong></td><td>Next.js 15 (App Router) + React 19 + Material UI 6 + Tanstack Query</td><td>Server-rendered hydration, accessible by default, customer-facing aesthetic</td></tr>
+    <tr><td><strong>Deployment</strong></td><td>docker-compose (dev) → containerised services (prod)</td><td>Single-command local dev; production-portable</td></tr>
+    <tr><td><strong>CI</strong></td><td>GitHub Actions — ruff + pytest + pgvector service</td><td>Lint + 160 offline tests + RLS-verified migration on every push</td></tr>
+  </table>
+
+  <h3>Layered architecture</h3>
+
+  <div class="diagram">
+    <pre class="mermaid">
+flowchart TB
+  subgraph FE[Frontend - Next.js 15 + MUI 6]
+    Workspace[Workspace<br/>Upload · Results · Review]
+    Brain[Brain<br/>Patterns · Facts · Auto-packs · Handlers]
+    Admin[Admin<br/>Tenants · Spend · Settings]
+    Chat[Chat Drawer<br/>RAG over corpus]
+  end
+
+  FE -->|/api/* proxied| API
+
+  subgraph API[API Layer - FastAPI]
+    Routes[Routes<br/>admin-or-tenant auth]
+    Auth[RLS context<br/>set_config app.tenant_id]
+  end
+
+  API --> Orch
+
+  subgraph Orch[Orchestrator - 19-stage pipeline]
+    direction LR
+    Ingest --> Eyes --> Hippo --> Pattern --> Hands --> Conscience --> Memory --> Insights --> Reflection --> Coverage --> Briefings --> Narrator --> Graph
+  end
+
+  Orch --> DB
+
+  subgraph DB[Persistence - Postgres 15 + pgvector]
+    Tables[tenants · documents · extractions<br/>patterns vec · doc_chunks vec · corrections vec<br/>tenant_facts · auto_pack_proposals<br/>audit_log · batches · cost_events]
+    RLS[FORCE ROW LEVEL SECURITY<br/>tenant_isolation policy on every table]
+  end
+
+  Orch -.handlers.-> CB[Code-Bridge<br/>Registered Python plugins]
+  Orch -.traces.-> LF[Langfuse<br/>self-hosted]
+  Orch -.embed.-> Emb[bge-m3<br/>local model]
+
+  style FE fill:#EEF2FF,stroke:#4338CA
+  style API fill:#E0E7FF,stroke:#4338CA
+  style Orch fill:#C7D2FE,stroke:#4338CA
+  style DB fill:#FEF3C7,stroke:#92400E
+    </pre>
+    <div class="diagram-caption">Figure 3 — Four-layer architecture: Frontend → API → Orchestrator → Persistence.</div>
+  </div>
+
+  <h3>The 19-stage pipeline</h3>
+
+  <div class="diagram">
+    <pre class="mermaid">
+flowchart TD
+  U[POST /process<br/>multipart files] --> S1[1. Ingest<br/>pdfplumber → text/pages/images]
+  S1 --> S2[2. Eyes - Classify<br/>LLM + content_signals shortcut<br/>industry · vendor · doc_type · confidence]
+  S2 --> S3{3. Hippocampus<br/>memory check<br/>pgvector ANN cosine}
+  S3 -- hit ≥0.82 --> S6
+  S3 -- miss --> S4[4. Pattern Cortex<br/>LLM discovers schema<br/>+ pack augmentation]
+  S4 --> S5[5. Conscience<br/>rule invention<br/>simpleeval expressions]
+  S5 --> S6
+  S6[6. Correction lookup<br/>exact + semantic ANN] --> S7
+  S7[7. Hands<br/>LLM extract values<br/>+ canonical alias normaliser] --> S8
+  S7 --> SQ{Quick mode?<br/>POST /process/quick}
+  SQ -- yes --> HQ[Heuristic regex extractor<br/>~150ms total]
+  HQ --> SX[Persist documents +<br/>extractions + batch]
+  S8[8. Conscience validate<br/>simpleeval rules → anomalies] --> S9
+  S9[9. Memory write<br/>UPSERT pattern by scope] --> S10
+  S10[10. Insight Cortex<br/>LLM + deterministic detectors:<br/>recurring vendors · pricing anomalies ·<br/>contract expirations] --> S11
+  S11[11. Inner Voice<br/>reflection on quality] --> S12
+  S12[12-13. Coverage + groups<br/>cross-doc clustering] --> S14
+  S14[14. Account briefings] --> S15
+  S15[15. Narrator<br/>LLM summary prose] --> S16
+  S16[16. BatchReport assembly] --> S17
+  S17[17-19. Graph build · KG insights<br/>cross-doc validation] --> O[Return BatchReport<br/>+ persist]
+
+  SX --> O
+
+  style S3 fill:#FEF3C7
+  style S6 fill:#FEF3C7
+  style HQ fill:#DCFCE7
+  style SQ fill:#FCE7F3
+    </pre>
+    <div class="diagram-caption">Figure 4 — The full 19-stage pipeline, with Quick-mode short-circuit highlighted.</div>
+  </div>
+
+  <h3>Two-track extraction strategy</h3>
+
+  <div class="diagram">
+    <pre class="mermaid">
+flowchart LR
+  subgraph T1[⚡ Quick Track]
+    Q1[Parse PDF text<br/>pdfplumber] --> Q2[Regex catalogue<br/>vendor · doc_no · dates ·<br/>amounts · payment terms]
+    Q2 --> Q3[Persist + return<br/>~150ms total]
+  end
+
+  subgraph T2[✨ Full Track]
+    F1[Parse + Eyes classify<br/>LLM call] --> F2[Schema discovery<br/>LLM + pack augment]
+    F2 --> F3[Hands extract<br/>LLM + VLM]
+    F3 --> F4[Conscience validate]
+    F4 --> F5[Insights + memory write<br/>~30s total]
+  end
+
+  U[Upload] --> T1
+  U --> T2
+
+  T1 -.upgrade later<br/>via Re-extract button.-> T2
+
+  style T1 fill:#DCFCE7,stroke:#16A34A
+  style T2 fill:#E0E7FF,stroke:#4338CA
+    </pre>
+    <div class="diagram-caption">Figure 5 — Two-track extraction: deterministic floor + LLM ceiling.</div>
+  </div>
+
+  <h3>Multi-tenant security model</h3>
+
+  <div class="diagram">
+    <pre class="mermaid">
+flowchart LR
+  C[Client request<br/>X-API-Key or X-Admin-Key] --> A{Auth resolver}
+  A -- tenant key --> T[tenant_session<br/>SET app.tenant_id = uuid]
+  A -- admin key --> AD[admin engine<br/>via mdi superuser]
+  T --> Q1[Query under RLS<br/>policy filters to tenant]
+  AD --> Q2[Cross-tenant query<br/>RLS bypassed]
+  Q1 --> R[Response<br/>only this tenant's rows]
+  Q2 --> R2[Response<br/>all rows + tenant_id per row]
+
+  style T fill:#DCFCE7
+  style AD fill:#FEE2E2
+    </pre>
+    <div class="diagram-caption">Figure 6 — Dual-engine connection pool: tenant_session (RLS-scoped) vs admin engine (cross-tenant).</div>
+  </div>
+
+  <h3>The self-training learning loop</h3>
+
+  <div class="diagram">
+    <pre class="mermaid">
+flowchart LR
+  D1[New document arrives] --> E[Eyes classifies]
+  E --> M{Hippocampus<br/>vector ANN}
+  M -- match --> RU[Reuse schema + rules]
+  M -- no match --> NP[New pattern]
+  NP -.write to pgvector.-> M
+  RU --> X[Extract values]
+  NP --> X
+  X --> R[Analyst reviews in UI]
+  R -- correct value --> C[Embed correction<br/>to pgvector + persist]
+  C -.bias future extracts.-> X
+  X --> O[Output structured data]
+
+  style M fill:#FEF3C7
+  style C fill:#DCFCE7
+    </pre>
+    <div class="diagram-caption">Figure 7 — How the brain learns: every document writes a pattern, every correction biases future extractions.</div>
+  </div>
+
+  <h3>Brain memory subsystems</h3>
+
+  <table>
+    <tr>
+      <th>Subsystem</th>
+      <th>Stores</th>
+      <th>Where</th>
+      <th>Used for</th>
+    </tr>
+    <tr>
+      <td><strong>Hippocampus patterns</strong></td>
+      <td>Schema + rules per (industry, vendor, doc_type)</td>
+      <td><code>patterns</code> table, <code>vector(1024)</code></td>
+      <td>Skip schema discovery on next similar doc</td>
+    </tr>
+    <tr>
+      <td><strong>Tenant facts</strong></td>
+      <td>Stable per-customer truths (account→vendor, contract→expiry)</td>
+      <td><code>tenant_facts</code> table</td>
+      <td>Cross-batch persistent knowledge</td>
+    </tr>
+    <tr>
+      <td><strong>Corrections</strong></td>
+      <td>Analyst edits with embedded context sentence</td>
+      <td><code>corrections</code> table, <code>vector(1024)</code></td>
+      <td>Bias future extractions toward analyst-approved values</td>
+    </tr>
+    <tr>
+      <td><strong>Auto-pack proposals</strong></td>
+      <td>Newly-discovered vendors awaiting curation</td>
+      <td><code>auto_pack_proposals</code></td>
+      <td>One-click pack creation; explicit promotion</td>
+    </tr>
+    <tr>
+      <td><strong>Handler registry</strong></td>
+      <td>Vetted Python callables triggerable by chat / patterns</td>
+      <td>In-process registry</td>
+      <td>Code-bridge — LLM dispatches but never executes</td>
+    </tr>
+  </table>
+
+  <h3>Key design decisions + reasoning</h3>
+
+  <table>
+    <tr><th style="width:34%">Decision</th><th>Reason</th></tr>
+    <tr>
+      <td>Open-vocabulary schema (not fixed templates)</td>
+      <td>Vendor layouts change constantly; templates need maintenance. Pattern Cortex discovers fields per-document; the canonical-alias layer keeps names stable downstream.</td>
+    </tr>
+    <tr>
+      <td>RLS + non-superuser app role</td>
+      <td>Tenant isolation enforced at the DB. App bugs cannot leak cross-tenant data. <code>FORCE ROW LEVEL SECURITY</code> at every migration.</td>
+    </tr>
+    <tr>
+      <td>Two-engine DB pool</td>
+      <td>App routes use mdi_app (NOBYPASSRLS). Admin cross-tenant routes use mdi (superuser). Separate pools prevent accidental scope creep.</td>
+    </tr>
+    <tr>
+      <td>Provider fallback chain</td>
+      <td>Gemini is cheap but rate-limits. Claude is the resilience layer. Same prompt contract; router walks the chain on retryable errors.</td>
+    </tr>
+    <tr>
+      <td>Heuristic extractor as Quick mode</td>
+      <td>LLM availability is never 100%. Regex floor gives an always-on path. Production-grade docs extract 6 fields in 150 ms with provenance.</td>
+    </tr>
+    <tr>
+      <td>pgvector instead of a separate vector DB</td>
+      <td>One DB to operate + back up + secure. HNSW scales to millions of vectors. Cross-table joins (extractions ↔ patterns) stay relational.</td>
+    </tr>
+    <tr>
+      <td>Pack abstraction (YAML, no Python)</td>
+      <td>Adding a vertical is a config commit, not a code release. Pack augmentation unifies LLM discovery + pack-declared fields.</td>
+    </tr>
+    <tr>
+      <td>Per-value provenance (source_text)</td>
+      <td>Every extracted field carries the substring that drove it. Audit + compliance + analyst trust.</td>
+    </tr>
+    <tr>
+      <td>Self-hosted Langfuse</td>
+      <td>Trace every LLM call without sending prompts / customer data to a 3rd-party cloud.</td>
+    </tr>
+    <tr>
+      <td>8px grid + WCAG AA</td>
+      <td>Accessibility by design. MUI Material 3 tokens default-compliant.</td>
+    </tr>
+  </table>
+
+  <h3>API surface (what the UI calls)</h3>
+
+  <table>
+    <tr><th>Route</th><th>Purpose</th></tr>
+    <tr><td><code>POST /process</code></td><td>Full 19-stage LLM pipeline</td></tr>
+    <tr><td><code>POST /process/quick</code></td><td>Heuristic-only fast lane (~150 ms / file)</td></tr>
+    <tr><td><code>GET /batches</code></td><td>Recent batches (admin-or-tenant auth)</td></tr>
+    <tr><td><code>GET /report/{id}</code></td><td>Full BatchReport for a batch</td></tr>
+    <tr><td><code>GET /admin/documents/{id}/text</code></td><td>Raw parsed text per document</td></tr>
+    <tr><td><code>POST /admin/documents/{id}/extract-heuristic</code></td><td>Re-run regex extractor on persisted doc</td></tr>
+    <tr><td><code>POST /correction</code></td><td>Analyst correction → pgvector embedding</td></tr>
+    <tr><td><code>GET /admin/patterns + /{id}</code></td><td>Memorised pattern explorer</td></tr>
+    <tr><td><code>GET /admin/tenant-facts</code></td><td>Per-tenant master data</td></tr>
+    <tr><td><code>GET /admin/auto-packs + /{id}/promote</code></td><td>Auto-discovered vendor proposals</td></tr>
+    <tr><td><code>GET /admin/handlers + /{id}/run</code></td><td>Code-bridge plugins</td></tr>
+    <tr><td><code>POST /chat</code></td><td>RAG over the tenant's corpus</td></tr>
+    <tr><td><code>GET /admin/spend</code></td><td>Cumulative LLM spend ledger</td></tr>
+  </table>
+
+  <h3>Operational characteristics</h3>
+
+  <table>
+    <tr><th>Metric</th><th>Target</th><th>Today</th></tr>
+    <tr><td>Quick-mode latency</td><td>&lt; 500 ms / file</td><td><strong>~150 ms</strong></td></tr>
+    <tr><td>Full-mode latency (LLM up)</td><td>&lt; 60 s / file</td><td><strong>~30 s</strong></td></tr>
+    <tr><td>Backend offline tests</td><td>green</td><td><strong>160 / 160</strong></td></tr>
+    <tr><td>Ruff lint</td><td>clean</td><td>clean</td></tr>
+    <tr><td>Bundle size (first-load JS)</td><td>&lt; 250 kB</td><td>~200 kB across all routes</td></tr>
+    <tr><td>Tenant isolation</td><td>RLS-enforced</td><td>yes + <code>FORCE ROW LEVEL SECURITY</code></td></tr>
+    <tr><td>Provider fallback</td><td>automatic</td><td>Gemini → Claude via router</td></tr>
+  </table>
+
+  <div class="callout">
+    <strong>How to share this:</strong> the file is self-contained — Mermaid diagrams render on open via CDN.
+    Open in Chrome, print to PDF, paste into Notion, or upload to Confluence as an HTML attachment.
+  </div>
+
+  <footer>
+    Modular Data Intelligence · v0.1 · Last updated 2026-06-05 ·
+    Source: <code>mdi/documents/platform-overview.html</code>
+  </footer>
+
+</div>
+
+<!-- Mermaid renderer — CDN, runs at page-load to render the <pre class="mermaid"> blocks above. -->
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<script>
+  mermaid.initialize({
+    startOnLoad: true,
+    theme: "neutral",
+    themeVariables: {
+      fontFamily: "Inter, system-ui, sans-serif",
+      primaryColor: "#EEF2FF",
+      primaryTextColor: "#1E1B4B",
+      primaryBorderColor: "#4F46E5",
+      lineColor: "#94A3B8",
+      tertiaryColor: "#FEF3C7",
+    },
+    flowchart: {
+      curve: "basis",
+      nodeSpacing: 38,
+      rankSpacing: 38,
+    },
+  });
+</script>
+</body>
+</html>
