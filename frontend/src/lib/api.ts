@@ -17,6 +17,8 @@ const API_KEY_STORAGE = "mdi.api_key";
 
 export type AutoPackProposal = {
   id: string;
+  /** Present in admin-auth mode (cross-tenant). */
+  tenant_id?: string;
   vendor_slug: string;
   vendor_name: string;
   doc_type_hint: string | null;
@@ -31,6 +33,7 @@ export type AutoPackProposal = {
 
 export type TenantFact = {
   id: string;
+  tenant_id?: string;
   fact_type: string;
   key: string;
   value: string;
@@ -73,6 +76,7 @@ export type SpendSnapshot = {
 
 export type PatternSummary = {
   id: string;
+  tenant_id?: string;
   industry: string;
   vendor: string;
   doc_type: string;
@@ -85,6 +89,7 @@ export type PatternSummary = {
 
 export type PatternDetail = {
   id: string;
+  tenant_id?: string;
   industry: string;
   vendor: string;
   doc_type: string;
@@ -230,24 +235,24 @@ export const api = {
   listBatches: (limit = 20) =>
     request<ListBatchesResult>(`/batches?limit=${limit}`, {}, { bothAuth: true }),
 
-  // Wave 3.3 — Hippocampus patterns explorer.
+  // Hippocampus patterns explorer (admin OR tenant auth).
   listPatterns: (params: { industry?: string; limit?: number } = {}) => {
     const q = new URLSearchParams();
     if (params.industry) q.set("industry", params.industry);
     if (params.limit) q.set("limit", String(params.limit));
     const qs = q.toString();
-    return request<{ patterns: PatternSummary[] }>(
-      `/admin/patterns${qs ? `?${qs}` : ""}`, {}, { admin: true },
+    return request<{ auth_mode: "admin" | "tenant"; patterns: PatternSummary[] }>(
+      `/admin/patterns${qs ? `?${qs}` : ""}`, {}, { bothAuth: true },
     );
   },
   getPattern: (id: string) =>
-    request<PatternDetail>(`/admin/patterns/${id}`, {}, { admin: true }),
+    request<PatternDetail>(`/admin/patterns/${id}`, {}, { bothAuth: true }),
 
-  // Auto-pack proposals
+  // Auto-pack proposals (admin OR tenant auth).
   listAutoPacks: (statusFilter = "pending") =>
-    request<{ proposals: AutoPackProposal[] }>(
+    request<{ auth_mode: "admin" | "tenant"; proposals: AutoPackProposal[] }>(
       `/admin/auto-packs?status_filter=${encodeURIComponent(statusFilter)}`,
-      {}, { admin: true },
+      {}, { bothAuth: true },
     ),
   promoteAutoPack: (id: string, decidedBy = "analyst") =>
     request(`/admin/auto-packs/${id}/promote`, {
@@ -260,12 +265,14 @@ export const api = {
       body: JSON.stringify({ decided_by: decidedBy }),
     }, { admin: true }),
 
-  // Tenant facts
+  // Tenant facts (admin OR tenant auth).
   listTenantFacts: (factType?: string, limit = 500) => {
     const q = factType
       ? `?fact_type=${encodeURIComponent(factType)}&limit=${limit}`
       : `?limit=${limit}`;
-    return request<{ facts: TenantFact[] }>(`/admin/tenant-facts${q}`, {}, { admin: true });
+    return request<{ auth_mode: "admin" | "tenant"; facts: TenantFact[] }>(
+      `/admin/tenant-facts${q}`, {}, { bothAuth: true },
+    );
   },
 
   // Handler registry

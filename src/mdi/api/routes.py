@@ -754,20 +754,94 @@ async def admin_issue_api_key(
 # ---------------------------------------------------------------------------
 # Auto-pack proposals queue (Wave 1.2 of the DD uplift)
 # ---------------------------------------------------------------------------
-@router.get("/admin/auto-packs", dependencies=[Depends(require_admin)])
+async def _resolve_admin_or_tenant(
+    x_api_key: str | None,
+    x_admin_key: str | None,
+    authorization: str | None,
+) -> tuple[uuid.UUID | None, bool]:
+    """Helper for endpoints that accept EITHER tenant or admin auth.
+
+    Returns (tenant_uuid_or_None, is_admin). Raises 401 only when
+    NEITHER auth header is supplied. Used by /admin/patterns,
+    /admin/tenant-facts, /admin/auto-packs — all surfaces an admin
+    user reasonably wants to browse across tenants.
+    """
+    from mdi.api.deps import authenticate as _auth_tenant
+    from mdi.api.deps import require_admin as _require_admin
+
+    if x_api_key or (authorization and authorization.lower().startswith("bearer ")):
+        tenant_uuid = await _auth_tenant(
+            authorization=authorization, x_api_key=x_api_key,
+        )
+        return tenant_uuid, False
+    if x_admin_key:
+        await _require_admin(x_admin_key=x_admin_key)
+        return None, True
+    raise HTTPException(
+        status.HTTP_401_UNAUTHORIZED,
+        "endpoint requires either X-API-Key (tenant) or X-Admin-Key (admin)",
+    )
+
+
+@router.get("/admin/auto-packs")
 async def admin_list_auto_packs(
     status_filter: str = "pending",
-    tenant: Tenant = Depends(current_tenant),
-    db: AsyncSession = Depends(db_session),
+    x_api_key: str | None = Header(default=None, alias="X-API-Key"),
+    x_admin_key: str | None = Header(default=None, alias="X-Admin-Key"),
+    authorization: str | None = Header(default=None),
 ) -> dict[str, Any]:
-    """List auto-discovered pack proposals.
+    """List auto-discovered pack proposals — admin OR tenant auth.
+
+    Admin mode lists across all tenants; tenant mode is RLS-scoped.
+    Each proposal carries a `tenant_id` in admin mode so the UI can
+    show which tenant a vendor was discovered for.
 
     `status_filter` defaults to `pending`; accepted values are
     pending / approved / rejected / superseded / all.
     """
-    from mdi.kernel.auto_pack_registry import list_proposals
-    _ = tenant  # RLS scopes the query — tenant FK is enforced by app.tenant_id GUC
-    return {"proposals": await list_proposals(db, status_filter=status_filter)}
+    from mdi.kernel.auth import get_admin_engine, tenant_session
+    tenant_uuid, is_admin = await _resolve_admin_or_tenant(
+        x_api_key, x_admin_key, authorization,
+    )
+    base_select = (
+        "SELECT id::text, tenant_id::text, vendor_slug, vendor_name, "
+        "       doc_type_hint, sighting_count, status, decided_by, "
+        "       decided_at, promoted_path, created_at, last_seen_at "
+        "FROM auto_pack_proposals "
+    )
+    where = "WHERE status = :s " if status_filter != "all" else ""
+    params: dict[str, Any] = {}
+    if status_filter != "all":
+        params["s"] = status_filter
+
+    if is_admin:
+        engine = get_admin_engine()
+        async with engine.connect() as conn:
+            rows = (await conn.execute(text(
+                base_select + where + "ORDER BY sighting_count DESC, created_at DESC"
+            ), params)).all()
+    else:
+        async with tenant_session(tenant_uuid) as db:  # type: ignore[arg-type]
+            rows = (await db.execute(text(
+                base_select + where + "ORDER BY sighting_count DESC, created_at DESC"
+            ), params)).all()
+
+    return {
+        "auth_mode": "admin" if is_admin else "tenant",
+        "proposals": [
+            {
+                "id": r[0], "tenant_id": r[1], "vendor_slug": r[2],
+                "vendor_name": r[3], "doc_type_hint": r[4],
+                "sighting_count": int(r[5] or 0),
+                "status": r[6], "decided_by": r[7],
+                "decided_at": str(r[8]) if r[8] else None,
+                "promoted_path": r[9],
+                "created_at": str(r[10]) if r[10] else None,
+                "last_seen_at": str(r[11]) if r[11] else None,
+            }
+            for r in rows
+        ],
+    }
 
 
 class AutoPackDecision(BaseModel):
@@ -854,49 +928,55 @@ async def admin_reject_auto_pack(
 async def admin_list_patterns(
     industry: str | None = None,
     limit: int = 100,
-    tenant: Tenant = Depends(current_tenant),
-    db: AsyncSession = Depends(db_session),
+    x_api_key: str | None = Header(default=None, alias="X-API-Key"),
+    x_admin_key: str | None = Header(default=None, alias="X-Admin-Key"),
+    authorization: str | None = Header(default=None),
 ) -> dict[str, Any]:
-    """List Hippocampus patterns the tenant has accumulated.
+    """List Hippocampus patterns — admin OR tenant auth.
 
-    Returns a lightweight summary per pattern — the full schema/rules
-    blobs only get fetched when the UI requests a single pattern via
-    GET /admin/patterns/{id}.
-
-    Why per-tenant: every pattern is RLS-scoped; the GUC bound from
-    current_tenant filters automatically.
+    Tenant mode: RLS-scoped, returns this tenant's patterns.
+    Admin mode: across all tenants; each row carries tenant_id.
     """
-    _ = tenant  # RLS filters via app.tenant_id GUC
+    from mdi.kernel.auth import get_admin_engine, tenant_session
+    tenant_uuid, is_admin = await _resolve_admin_or_tenant(
+        x_api_key, x_admin_key, authorization,
+    )
     limit = max(1, min(int(limit), 500))
+    base = (
+        "SELECT id::text, tenant_id::text, industry, vendor, doc_type, "
+        "       seen_count, last_seen_at, created_at, "
+        "       jsonb_array_length(schema_def->'fields') AS field_count, "
+        "       jsonb_array_length(rules->'rules') AS rule_count "
+        "FROM patterns "
+    )
+    where = "WHERE industry = :ind " if industry else ""
+    params: dict[str, Any] = {"limit": limit}
     if industry:
-        rows = (await db.execute(text(
-            "SELECT id::text, industry, vendor, doc_type, "
-            "       seen_count, last_seen_at, created_at, "
-            "       jsonb_array_length(schema_def->'fields') AS field_count, "
-            "       jsonb_array_length(rules->'rules') AS rule_count "
-            "FROM patterns WHERE industry = :ind "
-            "ORDER BY seen_count DESC, last_seen_at DESC "
-            "LIMIT :limit"
-        ), {"ind": industry, "limit": limit})).all()
+        params["ind"] = industry
+
+    if is_admin:
+        engine = get_admin_engine()
+        async with engine.connect() as conn:
+            rows = (await conn.execute(text(
+                base + where + "ORDER BY seen_count DESC, last_seen_at DESC LIMIT :limit"
+            ), params)).all()
     else:
-        rows = (await db.execute(text(
-            "SELECT id::text, industry, vendor, doc_type, "
-            "       seen_count, last_seen_at, created_at, "
-            "       jsonb_array_length(schema_def->'fields') AS field_count, "
-            "       jsonb_array_length(rules->'rules') AS rule_count "
-            "FROM patterns "
-            "ORDER BY seen_count DESC, last_seen_at DESC "
-            "LIMIT :limit"
-        ), {"limit": limit})).all()
+        async with tenant_session(tenant_uuid) as db:  # type: ignore[arg-type]
+            rows = (await db.execute(text(
+                base + where + "ORDER BY seen_count DESC, last_seen_at DESC LIMIT :limit"
+            ), params)).all()
+
     return {
+        "auth_mode": "admin" if is_admin else "tenant",
         "patterns": [
             {
-                "id": r[0], "industry": r[1], "vendor": r[2], "doc_type": r[3],
-                "seen_count": int(r[4] or 0),
-                "last_seen_at": str(r[5]) if r[5] else None,
-                "created_at": str(r[6]) if r[6] else None,
-                "field_count": int(r[7] or 0),
-                "rule_count": int(r[8] or 0),
+                "id": r[0], "tenant_id": r[1],
+                "industry": r[2], "vendor": r[3], "doc_type": r[4],
+                "seen_count": int(r[5] or 0),
+                "last_seen_at": str(r[6]) if r[6] else None,
+                "created_at": str(r[7]) if r[7] else None,
+                "field_count": int(r[8] or 0),
+                "rule_count": int(r[9] or 0),
             }
             for r in rows
         ],
@@ -906,26 +986,37 @@ async def admin_list_patterns(
 @router.get("/admin/patterns/{pattern_id}")
 async def admin_get_pattern(
     pattern_id: uuid.UUID,
-    tenant: Tenant = Depends(current_tenant),
-    db: AsyncSession = Depends(db_session),
+    x_api_key: str | None = Header(default=None, alias="X-API-Key"),
+    x_admin_key: str | None = Header(default=None, alias="X-Admin-Key"),
+    authorization: str | None = Header(default=None),
 ) -> dict[str, Any]:
-    """Full pattern detail — schema fields + rules. Used by the
-    Pattern detail drawer in the Brain page."""
-    _ = tenant
-    row = (await db.execute(text(
-        "SELECT id::text, industry, vendor, doc_type, schema_def, rules, "
-        "       seen_count, last_seen_at, created_at "
+    """Full pattern detail — schema fields + rules. Admin OR tenant auth."""
+    from mdi.kernel.auth import get_admin_engine, tenant_session
+    tenant_uuid, is_admin = await _resolve_admin_or_tenant(
+        x_api_key, x_admin_key, authorization,
+    )
+    q = (
+        "SELECT id::text, tenant_id::text, industry, vendor, doc_type, "
+        "       schema_def, rules, seen_count, last_seen_at, created_at "
         "FROM patterns WHERE id = :id"
-    ), {"id": str(pattern_id)})).first()
+    )
+    if is_admin:
+        engine = get_admin_engine()
+        async with engine.connect() as conn:
+            row = (await conn.execute(text(q), {"id": str(pattern_id)})).first()
+    else:
+        async with tenant_session(tenant_uuid) as db:  # type: ignore[arg-type]
+            row = (await db.execute(text(q), {"id": str(pattern_id)})).first()
     if row is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "pattern not found")
     return {
-        "id": row[0], "industry": row[1], "vendor": row[2], "doc_type": row[3],
-        "schema_def": row[4] or {},
-        "rules": row[5] or {},
-        "seen_count": int(row[6] or 0),
-        "last_seen_at": str(row[7]) if row[7] else None,
-        "created_at": str(row[8]) if row[8] else None,
+        "id": row[0], "tenant_id": row[1],
+        "industry": row[2], "vendor": row[3], "doc_type": row[4],
+        "schema_def": row[5] or {},
+        "rules": row[6] or {},
+        "seen_count": int(row[7] or 0),
+        "last_seen_at": str(row[8]) if row[8] else None,
+        "created_at": str(row[9]) if row[9] else None,
     }
 
 
@@ -1000,22 +1091,58 @@ async def admin_run_handler(
 # ---------------------------------------------------------------------------
 # Tenant facts — per-tenant master-data store (Wave 2.4)
 # ---------------------------------------------------------------------------
-@router.get("/admin/tenant-facts", dependencies=[Depends(require_admin)])
+@router.get("/admin/tenant-facts")
 async def admin_list_tenant_facts(
     fact_type: str | None = None,
     limit: int = 500,
-    tenant: Tenant = Depends(current_tenant),
-    db: AsyncSession = Depends(db_session),
+    x_api_key: str | None = Header(default=None, alias="X-API-Key"),
+    x_admin_key: str | None = Header(default=None, alias="X-Admin-Key"),
+    authorization: str | None = Header(default=None),
 ) -> dict[str, Any]:
-    """List facts the brain has learned about this tenant.
+    """List tenant facts — admin OR tenant auth.
 
-    `fact_type` filter is optional; common values: account, document_owner,
-    vendor_customer, contract_expires, governing_law. RLS scopes the
-    query to the current tenant.
+    Tenant mode: RLS-scoped to this tenant.
+    Admin mode: cross-tenant; each row includes tenant_id.
     """
-    from mdi.brain.master_data import get_facts
-    _ = tenant
-    return {"facts": await get_facts(db, fact_type=fact_type, limit=limit)}
+    from mdi.kernel.auth import get_admin_engine, tenant_session
+    tenant_uuid, is_admin = await _resolve_admin_or_tenant(
+        x_api_key, x_admin_key, authorization,
+    )
+    limit = max(1, min(int(limit), 5000))
+    base = (
+        "SELECT id::text, tenant_id::text, fact_type, key, value, confidence, "
+        "       source_doc_id::text, sighting_count, last_seen_at, created_at "
+        "FROM tenant_facts "
+    )
+    where = "WHERE fact_type = :ft " if fact_type else ""
+    params: dict[str, Any] = {"limit": limit}
+    if fact_type:
+        params["ft"] = fact_type
+    order = "ORDER BY confidence DESC, sighting_count DESC, last_seen_at DESC LIMIT :limit"
+
+    if is_admin:
+        engine = get_admin_engine()
+        async with engine.connect() as conn:
+            rows = (await conn.execute(text(base + where + order), params)).all()
+    else:
+        async with tenant_session(tenant_uuid) as db:  # type: ignore[arg-type]
+            rows = (await db.execute(text(base + where + order), params)).all()
+
+    return {
+        "auth_mode": "admin" if is_admin else "tenant",
+        "facts": [
+            {
+                "id": r[0], "tenant_id": r[1], "fact_type": r[2],
+                "key": r[3], "value": r[4],
+                "confidence": float(r[5] or 0.0),
+                "source_doc_id": r[6],
+                "sighting_count": int(r[7] or 0),
+                "last_seen_at": str(r[8]) if r[8] else None,
+                "created_at": str(r[9]) if r[9] else None,
+            }
+            for r in rows
+        ],
+    }
 
 
 # ---------------------------------------------------------------------------
