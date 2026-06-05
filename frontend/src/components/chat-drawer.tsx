@@ -319,15 +319,14 @@ export function ChatDrawer({ open, onClose }: { open: boolean; onClose: () => vo
 // ─────────────────────────────────────────────────────────────────────────
 function EmptyState({ onPick, disabled }: { onPick: (text: string) => void; disabled: boolean }) {
   return (
-    <Stack spacing={3} sx={{ pt: 1 }}>
+    <Stack spacing={2.5} sx={{ pt: 1 }}>
       <Box>
         <Typography variant="body2" sx={{ fontWeight: 600, mb: 0.5 }}>
-          Hi 👋 — I have access to every document this tenant has ingested.
+          Grounded in your indexed documents.
         </Typography>
-        <Typography variant="body2" color="text.secondary">
-          I can answer questions about vendors, contracts, spend trends, anomalies,
-          and any field that was extracted from your documents. Try one of these,
-          or type your own:
+        <Typography variant="body2" color="text.secondary" sx={{ lineHeight: 1.55 }}>
+          Ask about vendors, spend, anomalies, contract expiries — any field the
+          brain has extracted. Pick a starter, or type your own.
         </Typography>
       </Box>
       <Stack spacing={1}>
@@ -370,19 +369,6 @@ function EmptyState({ onPick, disabled }: { onPick: (text: string) => void; disa
           </Box>
         ))}
       </Stack>
-      <Box
-        sx={{
-          mt: 1, p: 1.5,
-          bgcolor: (t) => t.palette.mode === "dark" ? "rgba(99,102,241,.10)" : "rgba(99,102,241,.06)",
-          border: 1, borderColor: "primary.main", borderRadius: 1.5,
-          opacity: 0.85,
-        }}
-      >
-        <Typography variant="caption" color="text.secondary" sx={{ display: "block" }}>
-          <strong>Heads up:</strong> answers are grounded in your indexed documents.
-          If the brain hasn&apos;t seen something yet, it&apos;ll say so rather than guess.
-        </Typography>
-      </Box>
     </Stack>
   );
 }
