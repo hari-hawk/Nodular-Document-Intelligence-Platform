@@ -1,16 +1,18 @@
 "use client";
 
 import {
-  Box, Card, CardContent, Chip, Divider, IconButton, Stack,
-  Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
-  Tooltip, Typography,
+  Alert, Box, Button, Card, CardContent, Chip, CircularProgress, Collapse,
+  Divider, IconButton, Stack, Table, TableBody, TableCell, TableContainer,
+  TableHead, TableRow, Tooltip, Typography,
 } from "@mui/material";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
-  ArrowLeft, ChevronRight, FileText, Pencil, Sparkles, X,
+  AlertCircle, ArrowLeft, ChevronDown, ChevronRight, FileText, Pencil,
+  RefreshCw, Sparkles, X,
 } from "lucide-react";
 import { useState } from "react";
 
-import { type BatchReport } from "@/lib/api";
+import { api, type BatchReport } from "@/lib/api";
 import { FieldRow, fieldValueAsString } from "@/components/field-row";
 
 /**
@@ -42,13 +44,42 @@ export function DocumentDetail({
   onBack?: () => void;
   onClose?: () => void;
 }) {
+  const queryClient = useQueryClient();
   const cluster = report.clusters[document.document_id];
-  const extraction = report.extractions[document.document_id];
-  const fields = extraction?.fields || {};
+  // Local field state — starts from the batch report's extraction but
+  // gets replaced when the user runs the heuristic re-extractor.
+  const initialFields = report.extractions[document.document_id]?.fields || {};
+  const [fields, setFields] = useState<Record<string, { value: unknown; confidence: number; source_text?: string }>>(initialFields);
   const fieldEntries = Object.entries(fields);
   const docAnomalies = (report.anomalies || []).filter(
     (a) => a.field_path && fields[a.field_path.split(".")[0]],
   );
+
+  // Raw document text — load lazily when the user expands "Document text".
+  const [showRawText, setShowRawText] = useState(false);
+  const textQ = useQuery({
+    queryKey: ["doc-text", document.document_id],
+    queryFn: () => api.getDocumentText(document.document_id),
+    enabled: showRawText,
+  });
+
+  // Heuristic re-extract — pulls common invoice fields via regex without LLM.
+  const reExtract = useMutation({
+    mutationFn: () => api.extractHeuristic(document.document_id),
+    onSuccess: (r) => {
+      // Merge into our local field state so the UI updates immediately.
+      const merged = { ...fields };
+      for (const [k, v] of Object.entries(r.fields || {})) {
+        merged[k] = v as { value: unknown; confidence: number; source_text?: string };
+      }
+      setFields(merged);
+      // Invalidate the cached report so a future click re-fetches the
+      // freshly-extracted fields rather than showing the stale snapshot.
+      queryClient.invalidateQueries({ queryKey: ["report"] });
+    },
+  });
+
+  const noFields = fieldEntries.length === 0;
 
   return (
     <Card>
@@ -99,6 +130,99 @@ export function DocumentDetail({
           </Stack>
         </Box>
 
+        {/* ── Action bar ──────────────────────────────────────────── */}
+        <Box sx={{ px: 3, py: 2, borderBottom: 1, borderColor: "divider", bgcolor: "action.hover" }}>
+          <Stack direction={{ xs: "column", sm: "row" }} justifyContent="space-between" alignItems={{ sm: "center" }} spacing={1.5}>
+            <Typography variant="body2" color="text.secondary">
+              {noFields
+                ? "No fields extracted yet — try re-extract from text."
+                : `${fieldEntries.length} field${fieldEntries.length === 1 ? "" : "s"} extracted.`}
+            </Typography>
+            <Stack direction="row" spacing={1}>
+              <Button
+                variant={noFields ? "contained" : "outlined"}
+                size="small"
+                startIcon={
+                  reExtract.isPending
+                    ? <CircularProgress size={14} color="inherit" />
+                    : <RefreshCw size={14} />
+                }
+                onClick={() => reExtract.mutate()}
+                disabled={reExtract.isPending}
+              >
+                {reExtract.isPending ? "Extracting…" : noFields ? "Extract fields from text" : "Re-extract"}
+              </Button>
+              <Button
+                variant="outlined"
+                size="small"
+                startIcon={<FileText size={14} />}
+                onClick={() => setShowRawText((v) => !v)}
+              >
+                {showRawText ? "Hide" : "Show"} raw text
+              </Button>
+            </Stack>
+          </Stack>
+          {reExtract.isSuccess && (
+            <Alert severity="success" icon={<Sparkles size={16} />} sx={{ mt: 1.5, py: 0.5 }}>
+              <Typography variant="caption">
+                Extracted {reExtract.data?.updated ?? 0} field{(reExtract.data?.updated ?? 0) === 1 ? "" : "s"} from
+                the document text using deterministic patterns (no LLM call).
+              </Typography>
+            </Alert>
+          )}
+          {reExtract.isError && (
+            <Alert severity="error" icon={<AlertCircle size={16} />} sx={{ mt: 1.5, py: 0.5 }}>
+              <Typography variant="caption">{(reExtract.error as Error).message}</Typography>
+            </Alert>
+          )}
+        </Box>
+
+        {/* ── Raw text panel (collapsible) ───────────────────────── */}
+        <Collapse in={showRawText} unmountOnExit>
+          <Box sx={{ px: 3, py: 2, borderBottom: 1, borderColor: "divider", bgcolor: (t) => t.palette.mode === "dark" ? "rgba(15,23,42,.5)" : "rgba(248,250,252,.7)" }}>
+            <Typography variant="caption" sx={{ display: "block", mb: 1, textTransform: "uppercase", letterSpacing: "0.05em", fontWeight: 600, color: "text.secondary" }}>
+              Raw text from document parser
+            </Typography>
+            {textQ.isLoading ? (
+              <Stack direction="row" alignItems="center" spacing={1}>
+                <CircularProgress size={14} />
+                <Typography variant="caption" color="text.secondary">Loading text…</Typography>
+              </Stack>
+            ) : textQ.isError ? (
+              <Alert severity="warning">{(textQ.error as Error).message}</Alert>
+            ) : textQ.data?.text ? (
+              <Box
+                component="pre"
+                sx={{
+                  fontSize: "0.75rem",
+                  lineHeight: 1.6,
+                  fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
+                  whiteSpace: "pre-wrap",
+                  wordBreak: "break-word",
+                  m: 0,
+                  p: 2,
+                  borderRadius: 1,
+                  bgcolor: "background.paper",
+                  border: 1,
+                  borderColor: "divider",
+                  maxHeight: 360,
+                  overflowY: "auto",
+                }}
+              >
+                {textQ.data.text}
+              </Box>
+            ) : (
+              <Alert severity="info">
+                <Typography variant="caption">
+                  No parsed text available. This is usually an image-only / scanned PDF
+                  that needs VLM (vision) extraction. Field status:{" "}
+                  <Box component="strong">needs review</Box>.
+                </Typography>
+              </Alert>
+            )}
+          </Box>
+        </Collapse>
+
         {/* ── Extracted fields ───────────────────────────────────── */}
         <SectionStamp>Extracted fields ({fieldEntries.length})</SectionStamp>
         {fieldEntries.length === 0 ? (
@@ -107,10 +231,10 @@ export function DocumentDetail({
             <Typography variant="body1" sx={{ fontWeight: 500 }}>
               No fields extracted yet
             </Typography>
-            <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 0.5 }}>
-              The extraction stage may have rate-limited. Try re-uploading once
-              the LLM quota recovers; in the meantime, the schema (visible in
-              Brain → Patterns) shows what was discovered.
+            <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 0.5, maxWidth: 480, mx: "auto" }}>
+              Click <Box component="strong">Extract fields from text</Box> above to run the deterministic
+              regex extractor on whatever text the parser captured. This works even when the LLM is
+              rate-limited.
             </Typography>
           </Box>
         ) : (
@@ -141,38 +265,42 @@ export function DocumentDetail({
           </TableContainer>
         )}
 
-        {/* ── Per-document anomalies (when present) ──────────────── */}
+        {/* ── Per-document anomalies (collapsible, secondary) ────── */}
         {docAnomalies.length > 0 && (
           <>
             <Divider />
-            <SectionStamp>Anomalies on this document ({docAnomalies.length})</SectionStamp>
-            <Stack spacing={1} sx={{ px: 3, pb: 3 }}>
-              {docAnomalies.map((a, i) => (
-                <Stack
-                  key={i}
-                  direction="row"
-                  spacing={2}
-                  alignItems="flex-start"
-                  sx={{ p: 2, borderRadius: 1, bgcolor: "action.hover" }}
-                >
-                  <Chip
-                    label={a.severity}
-                    size="small"
-                    color={a.severity === "HIGH" ? "error" : a.severity === "MEDIUM" ? "warning" : "info"}
-                  />
-                  <Box sx={{ flex: 1 }}>
-                    <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                      {a.message}
-                    </Typography>
-                    {a.field_path && (
-                      <Typography variant="caption" color="text.secondary">
-                        on field: <code>{a.field_path}</code> · rule {a.rule_id}
+            <CollapsibleSection
+              label={`Anomalies on this document (${docAnomalies.length})`}
+              defaultOpen={false}
+            >
+              <Stack spacing={1} sx={{ px: 3, pb: 3 }}>
+                {docAnomalies.map((a, i) => (
+                  <Stack
+                    key={i}
+                    direction="row"
+                    spacing={2}
+                    alignItems="flex-start"
+                    sx={{ p: 2, borderRadius: 1, bgcolor: "action.hover" }}
+                  >
+                    <Chip
+                      label={a.severity}
+                      size="small"
+                      color={a.severity === "HIGH" ? "error" : a.severity === "MEDIUM" ? "warning" : "info"}
+                    />
+                    <Box sx={{ flex: 1 }}>
+                      <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                        {a.message}
                       </Typography>
-                    )}
-                  </Box>
-                </Stack>
-              ))}
-            </Stack>
+                      {a.field_path && (
+                        <Typography variant="caption" color="text.secondary">
+                          on field: <code>{a.field_path}</code> · rule {a.rule_id}
+                        </Typography>
+                      )}
+                    </Box>
+                  </Stack>
+                ))}
+              </Stack>
+            </CollapsibleSection>
           </>
         )}
 
@@ -284,6 +412,45 @@ function ConfidenceBar({ value }: { value: number }) {
         {pct}%
       </Typography>
     </Stack>
+  );
+}
+
+function CollapsibleSection({
+  label, defaultOpen = false, children,
+}: { label: string; defaultOpen?: boolean; children: React.ReactNode }) {
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <Box>
+      <Box
+        component="button"
+        onClick={() => setOpen(!open)}
+        aria-expanded={open}
+        sx={{
+          width: "100%",
+          display: "flex",
+          alignItems: "center",
+          gap: 1,
+          px: 3, py: 1.5,
+          textAlign: "left",
+          border: 0,
+          background: "transparent",
+          cursor: "pointer",
+          textTransform: "uppercase",
+          letterSpacing: "0.05em",
+          fontSize: "0.7rem",
+          fontWeight: 600,
+          color: "text.secondary",
+          bgcolor: "action.hover",
+          borderBottom: open ? 1 : 0,
+          borderColor: "divider",
+          "&:hover": { color: "text.primary" },
+        }}
+      >
+        {open ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+        {label}
+      </Box>
+      <Collapse in={open} unmountOnExit>{children}</Collapse>
+    </Box>
   );
 }
 

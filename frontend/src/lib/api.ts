@@ -310,6 +310,20 @@ export const api = {
       body: JSON.stringify({ question, history }),
     }),
 
+  // Per-document inspection (Wave 3.x — needed because LLM-driven
+  // extraction can be rate-limited; analysts still need to see what
+  // the parser captured + can trigger deterministic field extraction).
+  getDocumentText: (docId: string) =>
+    request<{ document_id: string; text: string; chunk_count: number }>(
+      `/admin/documents/${docId}/text`, {}, { bothAuth: true },
+    ),
+  extractHeuristic: (docId: string) =>
+    request<{ document_id: string; fields: Record<string, unknown>; updated: number }>(
+      `/admin/documents/${docId}/extract-heuristic`,
+      { method: "POST" },
+      { bothAuth: true },
+    ),
+
   // Corrections
   postCorrection: (payload: {
     industry: string; vendor: string; doc_type: string;

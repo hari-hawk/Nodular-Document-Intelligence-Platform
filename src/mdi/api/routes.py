@@ -1213,4 +1213,179 @@ async def admin_spend_snapshot() -> dict[str, Any]:
     }
 
 
+# ---------------------------------------------------------------------------
+# Document drill-down: raw text + heuristic re-extraction
+# ---------------------------------------------------------------------------
+# These two endpoints make documents inspectable even when the LLM is
+# rate-limited or offline. The user can SEE the parsed text and trigger
+# regex-based field extraction without paying for an LLM call.
+@router.get("/admin/documents/{document_id}/text")
+async def admin_get_document_text(
+    document_id: uuid.UUID,
+    x_api_key: str | None = Header(default=None, alias="X-API-Key"),
+    x_admin_key: str | None = Header(default=None, alias="X-Admin-Key"),
+    authorization: str | None = Header(default=None),
+) -> dict[str, Any]:
+    """Return the concatenated parsed text for a document.
+
+    The text lives in `doc_chunks` (RAG-indexed); we join the chunks
+    in `chunk_idx` order to reconstruct the original. Useful for the
+    DocumentDetail UI's "Raw text" panel — analysts can SEE what the
+    parser captured even when no fields were extracted yet.
+    """
+    from mdi.kernel.auth import get_admin_engine, tenant_session
+    tenant_uuid, is_admin = await _resolve_admin_or_tenant(
+        x_api_key, x_admin_key, authorization,
+    )
+    q = (
+        "SELECT chunk_idx, text FROM doc_chunks "
+        "WHERE document_id = :id ORDER BY chunk_idx ASC"
+    )
+    if is_admin:
+        engine = get_admin_engine()
+        async with engine.connect() as conn:
+            rows = (await conn.execute(text(q), {"id": str(document_id)})).all()
+    else:
+        async with tenant_session(tenant_uuid) as db:  # type: ignore[arg-type]
+            rows = (await db.execute(text(q), {"id": str(document_id)})).all()
+    if not rows:
+        # No chunks — either doc didn't get RAG-indexed (rare) or it
+        # genuinely had no extractable text (image-only scan). Surface
+        # the empty result so the UI shows the "needs review" message.
+        return {"document_id": str(document_id), "text": "", "chunk_count": 0}
+    full = "\n\n".join(r[1] for r in rows)
+    return {
+        "document_id": str(document_id),
+        "text": full,
+        "chunk_count": len(rows),
+    }
+
+
+@router.post("/admin/documents/{document_id}/extract-heuristic")
+async def admin_extract_heuristic(
+    document_id: uuid.UUID,
+    x_api_key: str | None = Header(default=None, alias="X-API-Key"),
+    x_admin_key: str | None = Header(default=None, alias="X-Admin-Key"),
+    authorization: str | None = Header(default=None),
+) -> dict[str, Any]:
+    """Run the deterministic regex extractor over the document's text
+    and persist any newly-found fields into the extractions row.
+
+    Idempotent — fields that already exist (from the LLM run) are kept
+    unless the heuristic produces a higher-confidence value. Returns
+    the full updated field dict for the document.
+
+    Use this when the LLM was rate-limited at upload time — analysts
+    don't need to re-upload, they just click "Extract fields" on the
+    Document detail page.
+    """
+    from mdi.brain.heuristic_extractor import extract_fields
+    from mdi.kernel.auth import get_admin_engine, tenant_session
+
+    tenant_uuid, is_admin = await _resolve_admin_or_tenant(
+        x_api_key, x_admin_key, authorization,
+    )
+    text_q = (
+        "SELECT text FROM doc_chunks "
+        "WHERE document_id = :id ORDER BY chunk_idx ASC"
+    )
+
+    if is_admin:
+        engine = get_admin_engine()
+        async with engine.connect() as conn:
+            text_rows = (await conn.execute(text(text_q), {"id": str(document_id)})).all()
+        if not text_rows:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "no parsed text for document")
+        full_text = "\n\n".join(r[0] for r in text_rows)
+        new_fields = extract_fields(full_text)
+        if not new_fields:
+            return {"document_id": str(document_id), "fields": {}, "updated": 0}
+        # Read current extraction, merge by confidence, write back.
+        async with engine.begin() as conn:
+            cur = (await conn.execute(text(
+                "SELECT tenant_id::text, fields FROM extractions WHERE document_id = :id"
+            ), {"id": str(document_id)})).first()
+            existing = (cur[1] or {}) if cur else {}
+            merged = _merge_fields_by_confidence(existing, new_fields)
+            if cur:
+                await conn.execute(text(
+                    "UPDATE extractions SET fields = CAST(:f AS JSONB) WHERE document_id = :id"
+                ), {"f": _json_dump(merged), "id": str(document_id)})
+            else:
+                # No prior extraction → insert one. We need the tenant_id;
+                # pull it from the document row.
+                drow = (await conn.execute(text(
+                    "SELECT tenant_id::text FROM documents WHERE id = :id"
+                ), {"id": str(document_id)})).first()
+                if drow is None:
+                    raise HTTPException(status.HTTP_404_NOT_FOUND, "document not found")
+                await conn.execute(text(
+                    "INSERT INTO extractions (tenant_id, document_id, fields, "
+                    "field_confidences, field_provenance, extraction_cost_usd) "
+                    "VALUES (:tid, :did, CAST(:f AS JSONB), '{}'::JSONB, '{}'::JSONB, 0.0)"
+                ), {"tid": drow[0], "did": str(document_id), "f": _json_dump(merged)})
+    else:
+        async with tenant_session(tenant_uuid) as db:  # type: ignore[arg-type]
+            text_rows = (await db.execute(text(text_q), {"id": str(document_id)})).all()
+            if not text_rows:
+                raise HTTPException(status.HTTP_404_NOT_FOUND, "no parsed text for document")
+            full_text = "\n\n".join(r[0] for r in text_rows)
+            new_fields = extract_fields(full_text)
+            if not new_fields:
+                return {"document_id": str(document_id), "fields": {}, "updated": 0}
+            cur = (await db.execute(text(
+                "SELECT fields FROM extractions WHERE document_id = :id"
+            ), {"id": str(document_id)})).first()
+            existing = (cur[0] or {}) if cur else {}
+            merged = _merge_fields_by_confidence(existing, new_fields)
+            if cur:
+                await db.execute(text(
+                    "UPDATE extractions SET fields = CAST(:f AS JSONB) WHERE document_id = :id"
+                ), {"f": _json_dump(merged), "id": str(document_id)})
+            else:
+                await db.execute(text(
+                    "INSERT INTO extractions (tenant_id, document_id, fields, "
+                    "field_confidences, field_provenance, extraction_cost_usd) "
+                    "VALUES (:tid, :did, CAST(:f AS JSONB), '{}'::JSONB, '{}'::JSONB, 0.0)"
+                ), {"tid": str(tenant_uuid), "did": str(document_id), "f": _json_dump(merged)})
+            await db.commit()
+
+    return {
+        "document_id": str(document_id),
+        "fields": {k: (v.model_dump() if hasattr(v, "model_dump") else v) for k, v in new_fields.items()},
+        "updated": len(new_fields),
+    }
+
+
+def _merge_fields_by_confidence(
+    existing: dict[str, Any],
+    new: dict[str, Any],
+) -> dict[str, Any]:
+    """Merge new heuristic fields into existing extraction.
+
+    Rule: if the field is missing or has 0 confidence in `existing`,
+    the heuristic value wins. If the existing value has higher
+    confidence (typical when LLM extraction ran successfully), the
+    existing one wins. Never overwrites a value with lower confidence —
+    protects analyst-corrected fields from regex regression.
+    """
+    out = dict(existing)
+    for k, v in new.items():
+        new_payload = v.model_dump() if hasattr(v, "model_dump") else v
+        prev = out.get(k)
+        if not prev:
+            out[k] = new_payload
+            continue
+        prev_conf = float(prev.get("confidence", 0.0)) if isinstance(prev, dict) else 0.0
+        new_conf = float(new_payload.get("confidence", 0.0)) if isinstance(new_payload, dict) else 0.0
+        if new_conf > prev_conf:
+            out[k] = new_payload
+    return out
+
+
+def _json_dump(d: dict[str, Any]) -> str:
+    import json
+    return json.dumps(d, default=str)
+
+
 _ = authenticate
