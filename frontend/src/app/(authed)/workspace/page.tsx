@@ -6,6 +6,7 @@ import { useState } from "react";
 
 import { api, BatchReport } from "@/lib/api";
 import { cn } from "@/lib/cn";
+import { FieldRow, fieldValueAsString } from "@/components/field-row";
 import { RecentBatches } from "@/components/recent-batches";
 import {
   Badge, Button, Card, CardBody, CardDescription, CardHeader, CardTitle,
@@ -295,12 +296,17 @@ function ResultsSection({ report }: { report: BatchReport }) {
                 </div>
               )}
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1.5 text-sm">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1 text-sm">
               {entries.map(([k, v]) => (
-                <div key={k} className="flex gap-2 text-sm">
-                  <span className="text-[rgb(var(--fg-muted))] min-w-[140px]">{k}:</span>
-                  <span className="font-mono truncate">{formatFieldValue(v.value)}</span>
-                </div>
+                <FieldRow
+                  key={k}
+                  fieldName={k}
+                  displayValue={formatFieldValue(v.value)}
+                  editValue={fieldValueAsString(v.value)}
+                  industry={cluster?.industry || "unknown"}
+                  vendor={cluster?.vendor || "unknown"}
+                  docType={cluster?.doc_type || "unknown"}
+                />
               ))}
               {entries.length === 0 && (
                 <span className="text-xs text-[rgb(var(--fg-muted))]">No fields extracted.</span>
