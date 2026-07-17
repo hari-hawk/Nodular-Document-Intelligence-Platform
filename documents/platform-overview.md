@@ -9,6 +9,12 @@ into structured, auditable data.
 
 ---
 
+## 🟢 Product direction — June 2026 · MDI ships as a library kit, not a monolithic platform
+
+Multiple project teams across the org do document extraction independently — each reinventing the pipeline. **MDI Kit** fixes that: `pip install mdi-kit`, pick a pack, pick your filters, upload a doc, get structured JSON. Runs entirely in the consuming team's environment; Vertex AI primary, Claude fallback; per-project brain (no cross-project leakage in v1). **MDI Studio** (what's already built) remains for pack authoring, correction review, and shared analytics. Full scope in [Part D — MDI Kit v1 initiative](#part-d---mdi-kit-v1-initiative-committed); design contract in `MDI-KIT-DESIGN.md`.
+
+---
+
 ## Part A — For Business Stakeholders
 
 ### The problem we solve
@@ -568,14 +574,155 @@ flowchart LR
 
 ---
 
+# Part D — MDI Kit v1 initiative  *(committed)*
+
+This is the current build direction. Everything in Parts A/B/C still holds — but **how** we ship it changes: the extraction brain is packaged as a Python library any project team can embed, not a platform every team logs into. Studio remains for pack authoring and correction review. Full API design contract lives in `MDI-KIT-DESIGN.md` at the repo root.
+
+## 1. Two products, cleanly separated
+
+| Product | What it is | Who uses it | Ships as |
+|---|---|---|---|
+| **MDI Kit** *(new — the library)* | The extraction brain, packaged. Import it, pick a pack + filters, get JSON out with confidence + provenance. | Engineers embedding extraction into their own apps. | `pip install mdi-kit` · CLI · Docker image · REST client (stub) |
+| **MDI Studio** *(what's built today)* | The hosted UI + shared learning + pack-authoring surface. Existing FastAPI + Next.js stack. | Pack authors · analysts reviewing extractions · admins. | Existing platform, imports from `mdi-core`. |
+
+> **Rule of thumb:** Studio *produces* packs. Kit *consumes* them. Kit runs in each team's own environment; Studio is where the brain matures. This separation turns MDI from "another platform" into an "extraction primitive."
+
+## 2. What a consumer's code looks like
+
+```python
+from mdi_kit import Brain
+
+brain = Brain(
+    pack="finance/invoice_v1",
+    filters=["vendor", "amount_due", "line_items", "due_date"],
+)
+
+result = brain.extract("path/to/invoice.pdf")
+
+print(result.fields)          # {vendor: "GEORGETOWN PAPER STOCK", amount_due: 12450.00, ...}
+print(result.confidence)      # {vendor: 0.94, amount_due: 0.98, ...}
+print(result.source_text)     # {vendor: "GEORGETOWN PAPER STOCK\n1234 Mill Rd", ...} ← provenance
+```
+
+That's the whole embedding cost for a project team. No pipeline setup, no LLM keys in their code, no pgvector. If they want learning + corrections, they graduate to stateful mode with their own Postgres.
+
+## 3. Kit ↔ Studio flow
+
+```mermaid
+flowchart LR
+  subgraph Consumers[Consumer project teams]
+    T1[Finance app]
+    T2[Legal app]
+    T3[Ops dashboard]
+  end
+
+  subgraph Kit[MDI Kit library]
+    Install[pip install mdi-kit] --> Brain[Brain: pack + filters]
+    Brain --> Extract[extract PDF]
+    Extract --> Result[Structured JSON + confidence + source]
+  end
+
+  Consumers --> Install
+
+  subgraph Registry[Git-backed pack registry]
+    Packs[packs/finance · legal · procurement]
+  end
+
+  Registry -->|packs pulled at runtime| Brain
+
+  subgraph Studio[MDI Studio]
+    Author[Pack authoring]
+    Review[Correction review]
+    Analytics[Cross-project analytics]
+  end
+
+  Studio -->|publishes new versions| Registry
+```
+*Figure 10 — Kit runs in each consumer's environment; Studio publishes packs to the shared registry; consumers pull packs at runtime.*
+
+## 4. What's in v1
+
+| # | Deliverable | What it is |
+|---|---|---|
+| 1 | **`mdi-kit` Python package** | Wraps the existing pipeline (Eyes → Hippocampus → Pattern Cortex → Hands → Conscience). PyPI-installable. |
+| 2 | **Pack composability** | Teams pick a base pack AND override the filter set. Kit resolves only requested fields. |
+| 3 | **Vertex AI adapter** | New adapter in the existing `llm_gateway` — teams pass GCP project/region/service account. Claude fallback via same gateway. |
+| 4 | **Two run modes** | *Stateless* (extract-and-forget, in-memory) *and* *Stateful* (bring-your-own-Postgres with pgvector). |
+| 5 | **CLI** | `mdi-kit extract --pack invoice_v1 file.pdf` for one-off use. `mdi-kit packs list/pull/push` for pack management. |
+| 6 | **Git-backed pack registry** | Packs live in a private org Git repo. Kit pulls/versions them (`pack@1.2.3`). Zero new infrastructure. |
+| 7 | **3 reference packs** | `finance/invoice_v1`, `legal/contract_v1`, `procurement/po_v1`. Real, working, tested. |
+| 8 | **Docs + 3 examples** | 5-line getting-started, filter composition guide, custom pack authoring guide. |
+| 9 | **Docker image** | Optional — for teams that want stateful mode without provisioning their own Postgres. |
+
+## 5. Explicitly out of v1 (parked for v2)
+
+| Deferred item | Why parked |
+|---|---|
+| Shared cross-project brain | Requires legal/compliance sign-off per consuming team. V1 keeps brain private per project. |
+| Hosted SaaS API | Library-first was the chosen consumption model. |
+| JS/TS SDK | Most extraction consumers are backend/data teams. Python covers 90% of demand for v1. |
+| Cross-org pack marketplace | Org-private packs only. |
+| Studio ↔ Kit live sync | Studio publishes to registry; Kit pulls on demand. No real-time link for v1. |
+
+## 6. The enabling refactor — repository restructure
+
+```
+mdi/
+  packages/
+    mdi-core/       ← pure extraction pipeline · no HTTP · no UI
+    mdi-kit/        ← consumer-facing library · imports mdi-core
+    mdi-studio/     ← existing FastAPI + Next.js · imports mdi-core
+    mdi-packs/      ← YAML packs · published to git-backed registry
+```
+
+This is the **first tangible step** and unblocks everything else. Highest-risk item because the current code has HTTP handlers, DB sessions, and pipeline stages tangled together. 1–2 weeks of careful work; everything downstream is mechanical once done.
+
+## 7. Sequencing (rough 6-week estimate)
+
+| Week | Theme | Milestone |
+|---|---|---|
+| **1–2** | Core extraction refactor | Extract pipeline from platform into standalone `mdi-core`. Add Vertex AI provider. Ship stateless mode + minimal CLI. Internal alpha. |
+| **3** | Pack composability | Filter selection layer. Refactor existing packs. |
+| **4** | Stateful mode + reference packs | Bring-your-own-Postgres. Ship 3 reference packs against real samples. |
+| **5** | Docs + first consumer | Docs site (or README-heavy). First internal team onboarded end-to-end. |
+| **6** | Iterate + v1.0 tag | Fix whatever the first consumer surfaced. Cut `v1.0`. Announce internally. |
+
+## 8. Technology stack — what earns its keep
+
+| Layer | Choice | Why |
+|---|---|---|
+| **LLM provider** | Vertex AI primary + Claude via Bedrock fallback | Vertex gives enterprise auth, org-level quotas, VPC, per-project GCP billing. Existing gateway abstraction keeps the swap clean. |
+| **Observability** | Self-hosted Langfuse (per-project or shared with project-tag scoping) | Each project team sees only their own traces. Kit auto-tags every LLM call with `project_id`. |
+| **Parsing** | pdfplumber + Docling | Already in the stack. Docling gives layout-aware parsing for tables. |
+| **Embeddings** | bge-m3 (local via sentence-transformers) | No per-team API key. Ships inside the kit. |
+| **Vector store** | pgvector in caller's Postgres OR ephemeral in-memory | Kit supports both. |
+| **Pack registry** | Git-backed (private repo per org), OCI later | Packs are YAML — versioning + PR review + rollback come free from Git. |
+| **Filter primitives** | Declarative composition layer over packs | Teams compose `["vendor", "amount_due"]` from any pack that defines them. |
+
+## 9. What "v1 done" looks like
+
+| Criterion | Measurable target |
+|---|---|
+| Consumer onboarding cost | ≤ 10 lines of Python from `pip install` to first structured extraction |
+| First-doc latency (stateless, Quick mode) | < 500 ms per file |
+| First-doc latency (stateless, Full mode via Vertex) | < 45 s per file |
+| Reference packs shipped | 3 packs (invoice, contract, PO), each with ≥ 5 sample documents and ≥ 85% field-level accuracy on those samples |
+| Docs completeness | Getting-started · filter composition · custom pack authoring · provider config · troubleshooting — 5 pages minimum |
+| First real consumer | At least one internal team using it against their own document corpus without hand-holding |
+
+> **What we need from stakeholders before build starts:** (a) confirm the first consumer project team so we build against their real docs, not synthetic; (b) confirm GCP project structure (each consuming team in their own project, or shared). Neither is blocking — but both meaningfully improve v1 quality.
+
+---
+
 ## Sharing this document
 
 - **For executives + buyers**: share Part A above (mermaid renders as inline diagrams in any markdown viewer).
 - **For technical architects**: share Part B (the layered diagram + pipeline diagram + decision table cover the core architecture; the API table maps directly to what the UI consumes).
-- **For product / planning**: share Part C — it's the roadmap section, with concrete tickets and a suggested sprint order.
+- **For product / planning**: share Parts C + D — C is the broader roadmap, D is the committed v1 initiative with concrete deliverables and sequencing.
+- **For engineering onboarding onto v1**: read `MDI-KIT-DESIGN.md` at the repo root — the full API design contract.
 - **GitHub / Notion / Confluence**: all three render Mermaid natively — paste this file in and the diagrams will appear.
 - **PDF export**: `pandoc platform-overview.md -o overview.pdf` produces a print-ready handout.
 
 ---
 
-*Last updated: 2026-06-05 · Maintained at `mdi/documents/platform-overview.md` · HTML mirror at `mdi/documents/platform-overview.html`.*
+*Last updated: 2026-06-05 · Maintained at `mdi/documents/platform-overview.md` · HTML mirror at `mdi/documents/platform-overview.html` · v1 design contract at `MDI-KIT-DESIGN.md`.*

@@ -264,10 +264,69 @@
     font-size: 14.5px;
   }
 
+  /* ─── Product-direction banner (sits between hero and Part A) ─── */
+  .direction-banner {
+    margin: 0 0 40px;
+    padding: 22px 28px;
+    background: linear-gradient(135deg, rgba(22,163,74,0.08), rgba(21,128,61,0.12));
+    border: 1px solid #86EFAC;
+    border-left: 4px solid #16A34A;
+    border-radius: 14px;
+    box-shadow: var(--shadow);
+  }
+  .direction-banner-tag {
+    display: inline-block;
+    padding: 3px 10px;
+    background: #16A34A;
+    color: white;
+    border-radius: 999px;
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    margin-bottom: 10px;
+  }
+  .direction-banner-heading {
+    margin: 0 0 8px;
+    font-size: 22px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    color: #14532D;
+  }
+  .direction-banner-body {
+    margin: 0;
+    font-size: 14.5px;
+    line-height: 1.6;
+    color: #14532D;
+  }
+  .direction-banner-body a { color: #15803D; font-weight: 600; text-decoration: underline; }
+  .direction-banner-body code {
+    background: rgba(21,128,61,0.10);
+    color: #14532D;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 12.5px;
+  }
+  @media (prefers-color-scheme: dark) {
+    .direction-banner {
+      background: linear-gradient(135deg, rgba(22,163,74,0.14), rgba(21,128,61,0.20));
+      border-color: #16A34A;
+    }
+    .direction-banner-heading,
+    .direction-banner-body { color: #DCFCE7; }
+    .direction-banner-body a { color: #86EFAC; }
+    .direction-banner-body code { background: rgba(22,163,74,0.20); color: #DCFCE7; }
+  }
+
   /* ─── Roadmap / future-work-specific styles ───────────────────── */
   h2.part .future-pill {
     background: #FEF3C7;
     color: #92400E;
+  }
+  h2.part .initiative-pill {
+    background: #DCFCE7;
+    color: #14532D;
+    border: 1px solid #86EFAC;
   }
   .priority-pill {
     display: inline-block;
@@ -358,6 +417,23 @@
       pattern, and gets smarter for the next one.
     </div>
   </header>
+
+  <!-- ─── PRODUCT-DIRECTION BANNER ──────────────────────────────── -->
+  <div class="direction-banner">
+    <div class="direction-banner-tag">Product direction · June 2026</div>
+    <h2 class="direction-banner-heading">MDI ships as a library kit — not a monolithic platform.</h2>
+    <p class="direction-banner-body">
+      Multiple project teams across the org do document extraction independently — each
+      reinventing the pipeline. <strong>MDI Kit</strong> fixes that:
+      <code>pip install mdi-kit</code>, pick a pack, pick your filters, upload a doc,
+      get structured JSON. Runs entirely in the consuming team's environment; Vertex AI
+      primary, Claude fallback; per-project brain (no cross-project leakage in v1).
+      <strong>MDI Studio</strong> (what's already built) remains for pack authoring,
+      correction review, and shared analytics. Full scope in
+      <a href="#part-d">Part D — MDI Kit v1 initiative</a>; design contract in
+      <code>MDI-KIT-DESIGN.md</code>.
+    </p>
+  </div>
 
   <!-- ─── PART A — BUSINESS STAKEHOLDERS ─────────────────────────── -->
   <h2 class="part">Part A — For Business Stakeholders<span class="pill">non-technical</span></h2>
@@ -1398,6 +1474,267 @@ flowchart LR
     tenant-scoped fine-tuning · M365 Graph push subscription · handwriting-specialised OCR ·
     multi-region GDPR sharding · on-prem deployment kit. All are real but speculative until
     proven demand exists.
+  </div>
+
+  <!-- ─── PART D — MDI KIT V1 INITIATIVE ─────────────────────────── -->
+  <h2 class="part" id="part-d">Part D — MDI Kit v1 initiative<span class="pill initiative-pill">committed</span></h2>
+
+  <p class="lede">
+    This is the current build direction. Everything in Parts A/B/C still holds — but
+    <strong>how</strong> we ship it changes: the extraction brain is packaged as a Python
+    library any project team can embed, not a platform every team logs into. Studio remains
+    for pack authoring and correction review. Full API design contract lives in
+    <code>MDI-KIT-DESIGN.md</code> at the repo root.
+  </p>
+
+  <!-- ─── D.1 ─ Two products ──────────────────────────────────── -->
+  <h3>1. Two products, cleanly separated</h3>
+
+  <table>
+    <tr>
+      <th style="width:18%">Product</th>
+      <th style="width:32%">What it is</th>
+      <th style="width:22%">Who uses it</th>
+      <th>Ships as</th>
+    </tr>
+    <tr>
+      <td><strong>MDI Kit</strong><br/><em>(new — the library)</em></td>
+      <td>The extraction brain, packaged. Import it, pick a pack + filters, get JSON out with confidence + provenance.</td>
+      <td>Engineers embedding extraction into their own apps.</td>
+      <td><code>pip install mdi-kit</code> · CLI · Docker image · REST client (stub)</td>
+    </tr>
+    <tr>
+      <td><strong>MDI Studio</strong><br/><em>(what's built today)</em></td>
+      <td>The hosted UI + shared learning + pack-authoring surface. Existing FastAPI + Next.js stack.</td>
+      <td>Pack authors · analysts reviewing extractions · admins.</td>
+      <td>Existing platform, imports from <code>mdi-core</code>.</td>
+    </tr>
+  </table>
+
+  <div class="callout">
+    <strong>Rule of thumb:</strong> Studio <em>produces</em> packs. Kit <em>consumes</em> them.
+    Kit runs in each team's own environment; Studio is where the brain matures.
+    This separation turns MDI from "another platform" into an "extraction primitive."
+  </div>
+
+  <!-- ─── D.2 ─ 5-line embed ──────────────────────────────────── -->
+  <h3>2. What a consumer's code looks like</h3>
+
+  <div class="example-block"><span class="key">from</span> mdi_kit <span class="key">import</span> Brain
+
+brain = Brain(
+    pack=<span class="val">"finance/invoice_v1"</span>,
+    filters=[<span class="val">"vendor"</span>, <span class="val">"amount_due"</span>, <span class="val">"line_items"</span>, <span class="val">"due_date"</span>],
+)
+
+result = brain.extract(<span class="val">"path/to/invoice.pdf"</span>)
+
+<span class="key">print</span>(result.fields)          <span class="comment"># {vendor: "GEORGETOWN PAPER STOCK", amount_due: 12450.00, ...}</span>
+<span class="key">print</span>(result.confidence)      <span class="comment"># {vendor: 0.94, amount_due: 0.98, ...}</span>
+<span class="key">print</span>(result.source_text)     <span class="comment"># {vendor: "GEORGETOWN PAPER STOCK\n1234 Mill Rd", ...} ← provenance</span>
+</div>
+
+  <p>
+    That's the whole embedding cost for a project team. No pipeline setup, no LLM keys
+    in their code, no pgvector. If they want learning + corrections, they graduate to
+    stateful mode with their own Postgres. If they want a UI on top, they wire Studio.
+  </p>
+
+  <!-- ─── D.3 ─ Kit ↔ Studio flow ─────────────────────────────── -->
+  <div class="diagram">
+    <pre class="mermaid">
+flowchart LR
+  subgraph Consumers[Consumer project teams]
+    T1[Finance app]
+    T2[Legal app]
+    T3[Ops dashboard]
+  end
+
+  subgraph Kit[MDI Kit library]
+    Install["pip install mdi-kit"] --> Brain[Brain: pack + filters]
+    Brain --> Extract[extract PDF]
+    Extract --> Result[Structured JSON<br/>+ confidence + source]
+  end
+
+  Consumers --> Install
+
+  subgraph Registry[Git-backed pack registry]
+    Packs["packs/finance · legal · procurement"]
+  end
+
+  Registry -->|packs pulled at runtime| Brain
+
+  subgraph Studio[MDI Studio]
+    Author[Pack authoring]
+    Review[Correction review]
+    Analytics[Cross-project analytics<br/>which packs, which fields, which confidence]
+  end
+
+  Studio -->|publishes new versions| Registry
+
+  style Kit fill:#DCFCE7,stroke:#15803D
+  style Studio fill:#EEF2FF,stroke:#4338CA
+  style Registry fill:#FEF3C7,stroke:#92400E
+    </pre>
+    <div class="diagram-caption">Figure 10 — Kit runs in each consumer's environment; Studio publishes packs to the shared registry; consumers pull packs at runtime.</div>
+  </div>
+
+  <!-- ─── D.4 ─ Scope ─────────────────────────────────────────── -->
+  <h3>3. What's in v1</h3>
+
+  <table>
+    <tr>
+      <th style="width:4%">#</th>
+      <th style="width:26%">Deliverable</th>
+      <th>What it is</th>
+    </tr>
+    <tr><td>1</td><td><strong><code>mdi-kit</code> Python package</strong></td><td>Wraps the existing pipeline (Eyes → Hippocampus → Pattern Cortex → Hands → Conscience). PyPI-installable.</td></tr>
+    <tr><td>2</td><td><strong>Pack composability</strong></td><td>Teams pick a base pack AND override the filter set. Kit resolves only requested fields.</td></tr>
+    <tr><td>3</td><td><strong>Vertex AI adapter</strong></td><td>New adapter in the existing <code>llm_gateway</code> — teams pass GCP project/region/service account. Claude fallback via same gateway.</td></tr>
+    <tr><td>4</td><td><strong>Two run modes</strong></td><td><em>Stateless</em> (extract-and-forget, in-memory) <em>and</em> <em>Stateful</em> (bring-your-own-Postgres with pgvector for the learning loop).</td></tr>
+    <tr><td>5</td><td><strong>CLI</strong></td><td><code>mdi-kit extract --pack invoice_v1 file.pdf</code> for one-off use. <code>mdi-kit packs list/pull/push</code> for pack management.</td></tr>
+    <tr><td>6</td><td><strong>Git-backed pack registry</strong></td><td>Packs live in a private org Git repo. Kit pulls/versions them (<code>pack@1.2.3</code>). Zero new infrastructure.</td></tr>
+    <tr><td>7</td><td><strong>3 reference packs</strong></td><td><code>finance/invoice_v1</code>, <code>legal/contract_v1</code>, <code>procurement/po_v1</code>. Real, working, tested.</td></tr>
+    <tr><td>8</td><td><strong>Docs + 3 examples</strong></td><td>5-line getting-started, filter composition guide, custom pack authoring guide.</td></tr>
+    <tr><td>9</td><td><strong>Docker image</strong></td><td>Optional — for teams that want stateful mode without provisioning their own Postgres. Bundles Postgres + pgvector.</td></tr>
+  </table>
+
+  <!-- ─── D.5 ─ Out of scope ──────────────────────────────────── -->
+  <h3>4. Explicitly out of v1 (parked for v2)</h3>
+
+  <table>
+    <tr><th style="width:40%">Deferred item</th><th>Why parked</th></tr>
+    <tr><td>Shared cross-project brain</td><td>Requires legal/compliance sign-off per consuming team. V1 keeps brain private per project — no accidental data leakage across teams.</td></tr>
+    <tr><td>Hosted SaaS API</td><td>Library-first was the chosen consumption model. Hosted API stays as a v2 option if a team specifically asks.</td></tr>
+    <tr><td>JS/TS SDK</td><td>Most extraction consumers are backend/data teams. Python covers 90% of demand for v1.</td></tr>
+    <tr><td>Cross-org pack marketplace</td><td>Org-private packs only. Public marketplace is a downstream conversation once the internal registry pattern is proven.</td></tr>
+    <tr><td>Studio ↔ Kit live sync</td><td>Studio publishes packs to registry; Kit pulls on demand. No real-time link needed for v1.</td></tr>
+  </table>
+
+  <!-- ─── D.6 ─ Repo restructure ──────────────────────────────── -->
+  <h3>5. The enabling refactor — repository restructure</h3>
+
+  <p>
+    Today <code>mdi/src/mdi/</code> is one monolith. To ship a library cleanly, split into
+    four packages under a monorepo. Studio keeps working — it just imports from
+    <code>mdi-core</code> instead of owning it.
+  </p>
+
+  <div class="example-block">mdi/
+  packages/
+    mdi-core/       <span class="comment">← pure extraction pipeline · no HTTP · no UI</span>
+    mdi-kit/        <span class="comment">← consumer-facing library · imports mdi-core</span>
+    mdi-studio/     <span class="comment">← existing FastAPI + Next.js · imports mdi-core</span>
+    mdi-packs/      <span class="comment">← YAML packs · published to git-backed registry</span>
+</div>
+
+  <p>
+    This is the <strong>first tangible step</strong> and unblocks everything else. It's
+    also the highest-risk item because the current code has HTTP handlers, DB session
+    management, and pipeline stages tangled together. Untangling them is 1–2 weeks of
+    careful work — but everything downstream is mechanical once it's done.
+  </p>
+
+  <!-- ─── D.7 ─ Sequencing ────────────────────────────────────── -->
+  <h3>6. Sequencing (rough 6-week estimate)</h3>
+
+  <table>
+    <tr>
+      <th style="width:12%">Week</th>
+      <th style="width:24%">Theme</th>
+      <th>Milestone</th>
+    </tr>
+    <tr>
+      <td><strong>1–2</strong></td>
+      <td>Core extraction refactor</td>
+      <td>Extract pipeline from platform into standalone <code>mdi-core</code>. Add Vertex AI provider. Ship <em>stateless</em> mode + minimal CLI. Internal alpha.</td>
+    </tr>
+    <tr>
+      <td><strong>3</strong></td>
+      <td>Pack composability</td>
+      <td>Filter selection layer. Refactor existing packs to work under the new public interface.</td>
+    </tr>
+    <tr>
+      <td><strong>4</strong></td>
+      <td>Stateful mode + reference packs</td>
+      <td>Bring-your-own-Postgres mode. Ship <code>invoice_v1</code>, <code>contract_v1</code>, <code>po_v1</code> tested against real samples.</td>
+    </tr>
+    <tr>
+      <td><strong>5</strong></td>
+      <td>Docs + first consumer</td>
+      <td>Docs site (or README-heavy). First internal team onboarded end-to-end.</td>
+    </tr>
+    <tr>
+      <td><strong>6</strong></td>
+      <td>Iterate + v1.0 tag</td>
+      <td>Fix whatever the first consumer surfaced. Cut <code>v1.0</code>. Announce internally.</td>
+    </tr>
+  </table>
+
+  <!-- ─── D.8 ─ Technology stack ──────────────────────────────── -->
+  <h3>7. Technology stack — what earns its keep</h3>
+
+  <table>
+    <tr>
+      <th style="width:20%">Layer</th>
+      <th style="width:26%">Choice</th>
+      <th>Why</th>
+    </tr>
+    <tr>
+      <td><strong>LLM provider</strong></td>
+      <td>Vertex AI primary + Claude via Bedrock fallback</td>
+      <td>Vertex gives enterprise auth, org-level quotas, VPC, per-project GCP billing — critical when multiple project teams consume the same kit. Existing gateway abstraction keeps the swap clean.</td>
+    </tr>
+    <tr>
+      <td><strong>Observability</strong></td>
+      <td>Self-hosted Langfuse, one instance per consuming project OR shared with project-tag scoping</td>
+      <td>Each project team sees only their own traces. Kit auto-tags every LLM call with <code>project_id</code> — no cross-project data leakage.</td>
+    </tr>
+    <tr>
+      <td><strong>Parsing</strong></td>
+      <td>pdfplumber + Docling</td>
+      <td>Already in the stack. Docling gives layout-aware parsing for tables.</td>
+    </tr>
+    <tr>
+      <td><strong>Embeddings</strong></td>
+      <td>bge-m3 (local via sentence-transformers)</td>
+      <td>No per-team API key. Ships inside the kit.</td>
+    </tr>
+    <tr>
+      <td><strong>Vector store</strong></td>
+      <td>pgvector in caller's Postgres OR ephemeral in-memory</td>
+      <td>Kit supports both. Teams that want learning bring a DB; teams that want extract-and-forget don't.</td>
+    </tr>
+    <tr>
+      <td><strong>Pack registry</strong></td>
+      <td>Git-backed (private repo per org), OCI later</td>
+      <td>Packs are YAML — versioning + PR review + rollback come free from Git. Teams <code>mdi-kit packs pull finance/invoice_v1@2.3</code>.</td>
+    </tr>
+    <tr>
+      <td><strong>Filter primitives</strong></td>
+      <td>Declarative composition layer over packs</td>
+      <td>Teams compose <code>["vendor", "amount_due"]</code> from any pack that defines them. Kit resolves + runs.</td>
+    </tr>
+  </table>
+
+  <!-- ─── D.9 ─ Success criteria ──────────────────────────────── -->
+  <h3>8. What "v1 done" looks like</h3>
+
+  <table>
+    <tr><th style="width:44%">Criterion</th><th>Measurable target</th></tr>
+    <tr><td>Consumer onboarding cost</td><td>≤ 10 lines of Python from <code>pip install</code> to first structured extraction</td></tr>
+    <tr><td>First-doc latency (stateless, Quick mode)</td><td>&lt; 500 ms per file</td></tr>
+    <tr><td>First-doc latency (stateless, Full mode via Vertex)</td><td>&lt; 45 s per file</td></tr>
+    <tr><td>Reference packs shipped</td><td>3 packs (invoice, contract, PO), each with ≥ 5 sample documents and ≥ 85% field-level accuracy on those samples</td></tr>
+    <tr><td>Docs completeness</td><td>Getting-started · filter composition · custom pack authoring · provider config · troubleshooting — 5 pages minimum</td></tr>
+    <tr><td>First real consumer</td><td>At least one internal team using it against their own document corpus without hand-holding</td></tr>
+  </table>
+
+  <div class="callout">
+    <strong>What we need from stakeholders before build starts:</strong>
+    (a) confirm the first consumer project team so we build against their real docs, not synthetic;
+    (b) confirm GCP project structure (each consuming team in their own project, or shared).
+    Neither is blocking — but both meaningfully improve v1 quality.
   </div>
 
   <div class="callout">
